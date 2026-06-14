@@ -785,7 +785,12 @@ const isLowPowerDevice =
 
 
 // ─── 渲染器 ──────────────────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: !isLowPowerDevice,
+  alpha: true,
+  powerPreference: 'high-performance',
+  preserveDrawingBuffer: false
+});
 renderer.setPixelRatio(
   isLowPowerDevice
     ? Math.min(window.devicePixelRatio, 1.2)
@@ -804,11 +809,13 @@ const scene = new THREE.Scene();
 scene.background = null;
 
 // 中性摄影棚环境反射，让银灰金属呈现真实高光与明暗层次
-const pmremGenerator = new THREE.PMREMGenerator(renderer);
-const roomEnvironment = new RoomEnvironment();
-scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
-roomEnvironment.dispose();
-pmremGenerator.dispose();
+if (!isLowPowerDevice) {
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const roomEnvironment = new RoomEnvironment();
+  scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
+  roomEnvironment.dispose();
+  pmremGenerator.dispose();
+}
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
 
@@ -910,10 +917,11 @@ const _pickPointer = new THREE.Vector2();
 
 // 生成细密、低对比度的金属颗粒纹理，用于微表面粗糙度和极轻微凹凸
 const metalGrainCanvas = document.createElement('canvas');
-metalGrainCanvas.width = 512;
-metalGrainCanvas.height = 512;
+const metalGrainSize = isLowPowerDevice ? 128 : 512;
+metalGrainCanvas.width = metalGrainSize;
+metalGrainCanvas.height = metalGrainSize;
 const grainCtx = metalGrainCanvas.getContext('2d');
-const grainImage = grainCtx.createImageData(512, 512);
+const grainImage = grainCtx.createImageData(metalGrainSize, metalGrainSize);
 
 for (let i = 0; i < grainImage.data.length; i += 4) {
   const fineNoise = 38 + Math.random() * 176;
@@ -930,23 +938,33 @@ grainCtx.putImageData(grainImage, 0, 0);
 const metalGrainTexture = new THREE.CanvasTexture(metalGrainCanvas);
 metalGrainTexture.wrapS = THREE.RepeatWrapping;
 metalGrainTexture.wrapT = THREE.RepeatWrapping;
-metalGrainTexture.repeat.set(18, 18);
+metalGrainTexture.repeat.set(isLowPowerDevice ? 8 : 18, isLowPowerDevice ? 8 : 18);
 metalGrainTexture.colorSpace = THREE.NoColorSpace;
-metalGrainTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+metalGrainTexture.anisotropy = isLowPowerDevice
+  ? 1
+  : renderer.capabilities.getMaxAnisotropy();
 
-const goldMaterial = new THREE.MeshPhysicalMaterial({
-  color: 0xb78b32,
-  metalness: 0.96,
-  roughness: 0.23,
-  roughnessMap: metalGrainTexture,
-  bumpMap: metalGrainTexture,
-  bumpScale: 0.014,
-  clearcoat: 0.46,
-  clearcoatRoughness: 0.08,
-  envMapIntensity: 2.0,
-  flatShading: true,
-  side: THREE.DoubleSide
-});
+const goldMaterial = isLowPowerDevice
+  ? new THREE.MeshStandardMaterial({
+      color: 0xb78b32,
+      metalness: 0.88,
+      roughness: 0.30,
+      flatShading: true,
+      side: THREE.DoubleSide
+    })
+  : new THREE.MeshPhysicalMaterial({
+      color: 0xb78b32,
+      metalness: 0.96,
+      roughness: 0.23,
+      roughnessMap: metalGrainTexture,
+      bumpMap: metalGrainTexture,
+      bumpScale: 0.014,
+      clearcoat: 0.46,
+      clearcoatRoughness: 0.08,
+      envMapIntensity: 2.0,
+      flatShading: true,
+      side: THREE.DoubleSide
+    });
 const chairMaterial = goldMaterial;
 const chairInstances = [];
 
@@ -965,8 +983,8 @@ function getMirrorTextureSize() {
 
 // 仅供镜面反射使用的黑色背景；主场景仍保持透明，由网页白色背景显示。
 const skyCanvas = document.createElement('canvas');
-skyCanvas.width = 1024;
-skyCanvas.height = 512;
+skyCanvas.width = isLowPowerDevice ? 2 : 1024;
+skyCanvas.height = isLowPowerDevice ? 2 : 512;
 const skyCtx = skyCanvas.getContext('2d');
 skyCtx.fillStyle = '#000000';
 skyCtx.fillRect(0, 0, skyCanvas.width, skyCanvas.height);
@@ -1294,6 +1312,21 @@ fetch(new URL('./intro.rtf', import.meta.url))
 
 
 // ─── 加载模型 ────────────────────────────────────────────────────────────────
+const mobileLoadingNotice = document.createElement('div');
+mobileLoadingNotice.textContent = 'LOADING 3D';
+mobileLoadingNotice.style.cssText = [
+  'position:fixed',
+  'left:50%',
+  'top:50%',
+  'transform:translate(-50%,-50%)',
+  'z-index:60',
+  'font:700 12px/1 Arial,sans-serif',
+  'letter-spacing:.14em',
+  'color:#999',
+  'pointer-events:none',
+  'transition:opacity 180ms ease'
+].join(';');
+if (isLowPowerDevice) document.body.appendChild(mobileLoadingNotice);
 const loader = new GLTFLoader();
 
 // chair.glb 与 chair4.glb 是同一把，因此阵列只加载一份，避免重复造型。
@@ -1402,6 +1435,8 @@ Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
     const heroAnchorZ = (heroRow - (rows - 1) / 2) * spacingZ;
 
     for (let row = 0; row < rows; row++) {
+      if (isLowPowerDevice && row !== heroRow) continue;
+
       for (let column = 0; column < columns; column++) {
         const staggerX = row % 2 === 0 ? 0 : spacingX * 0.5;
         const targetPosition = new THREE.Vector3(
@@ -1631,23 +1666,33 @@ Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
     camera.lookAt(closeCameraTarget);
     camera.updateProjectionMatrix();
 
-    const shadowGeometry = new THREE.PlaneGeometry(arraySize.x * 1.45, arraySize.z * 1.45);
-    const shadowMaterial = new THREE.ShadowMaterial({
-      color: 0x8a8a8a,
-      opacity: 0.20,
-      transparent: true,
-      depthWrite: false
-    });
-    const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
-    shadowCatcher.rotation.x = -Math.PI / 2;
-    shadowCatcher.position.set(arrayCenter.x, -size.y * 0.53, arrayCenter.z);
-    shadowCatcher.receiveShadow = true;
-    scene.add(shadowCatcher);
+    if (!isLowPowerDevice) {
+      const shadowGeometry = new THREE.PlaneGeometry(arraySize.x * 1.45, arraySize.z * 1.45);
+      const shadowMaterial = new THREE.ShadowMaterial({
+        color: 0x8a8a8a,
+        opacity: 0.20,
+        transparent: true,
+        depthWrite: false
+      });
+      const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
+      shadowCatcher.rotation.x = -Math.PI / 2;
+      shadowCatcher.position.set(arrayCenter.x, -size.y * 0.53, arrayCenter.z);
+      shadowCatcher.receiveShadow = true;
+      scene.add(shadowCatcher);
+    }
 
+    if (mobileLoadingNotice.isConnected) {
+      mobileLoadingNotice.style.opacity = '0';
+      window.setTimeout(() => mobileLoadingNotice.remove(), 220);
+    }
     console.log(`金色椅子加载成功，独立三角面总数: ${triMeshes.length}`);
   })
   .catch((err) => {
     console.error('椅子模型加载或页面初始化失败:', err);
+    if (mobileLoadingNotice.isConnected) {
+      mobileLoadingNotice.textContent = '3D LOAD FAILED';
+      mobileLoadingNotice.style.color = '#c00';
+    }
     const message = document.createElement('div');
     message.textContent = '椅子模型加载失败，请检查文件名和浏览器控制台';
     message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:10;';
