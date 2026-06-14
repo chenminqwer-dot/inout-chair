@@ -779,15 +779,23 @@ const CONFIG = {
   pointerEase:        0.22
 };
 
+const isLowPowerDevice =
+  window.matchMedia('(max-width: 900px)').matches ||
+  /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
 
 // ─── 渲染器 ──────────────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(
+  isLowPowerDevice
+    ? Math.min(window.devicePixelRatio, 1.2)
+    : Math.min(window.devicePixelRatio, 2)
+);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.12;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !isLowPowerDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
@@ -827,7 +835,10 @@ const topLight = new THREE.DirectionalLight(0xffffff, 4.4);
 topLight.position.set(-12, 9, 10);
 topLight.target.position.set(0, 0, 0);
 topLight.castShadow = true;
-topLight.shadow.mapSize.set(2048, 2048);
+topLight.shadow.mapSize.set(
+  isLowPowerDevice ? 512 : 2048,
+  isLowPowerDevice ? 512 : 2048
+);
 topLight.shadow.camera.near = 0.1;
 topLight.shadow.camera.far = 120;
 topLight.shadow.bias = -0.00035;
@@ -859,6 +870,7 @@ const _hitResult = new THREE.Vector3(); // intersectPlane 复用目标
 
 // ─── 运行时状态 ──────────────────────────────────────────────────────────────
 let triMeshes          = [];   // { mesh, origCenter, faceNormal, currentOffset, targetOffset }
+let chairPickMeshes    = [];
 let modelSize          = 1;    // 包围盒最大维度（世界单位）
 let floatAmplitudeWorld= 0.1;  // 悬浮幅度（世界单位）
 let chairModelSize = new THREE.Vector3(1, 1, 1);
@@ -942,6 +954,8 @@ const chairInstances = [];
 const chairMirrors = [];
 
 function getMirrorTextureSize() {
+  if (isLowPowerDevice) return 256;
+
   const longestSide = Math.max(window.innerWidth, window.innerHeight);
   return Math.min(
     1536,
@@ -1283,15 +1297,19 @@ fetch(new URL('./intro.rtf', import.meta.url))
 const loader = new GLTFLoader();
 
 // chair.glb 与 chair4.glb 是同一把，因此阵列只加载一份，避免重复造型。
-const chairModelPaths = [
-  './chair.glb',
-  './chair1.glb',
-  './chair2.glb',
-  './chair3.glb',
-  './chair5.glb',
-  './chair6.glb',
-  './chair7.glb'
-].map((path) => new URL(path, import.meta.url).href);
+const chairModelPaths = (
+  isLowPowerDevice
+    ? ['./chair.glb']
+    : [
+        './chair.glb',
+        './chair1.glb',
+        './chair2.glb',
+        './chair3.glb',
+        './chair5.glb',
+        './chair6.glb',
+        './chair7.glb'
+      ]
+).map((path) => new URL(path, import.meta.url).href);
 
 Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
   .then((gltfs) => {
@@ -1310,39 +1328,46 @@ Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
     const maxDim = Math.max(size.x, size.y, size.z);
 
     // 统一所有椅子模型的中心与视觉尺寸，阵列里随机使用不同造型。
-    const arraySourceModels = gltfs.map((loaded, modelIndex) => {
-      const model = loaded.scene;
+    const arraySourceModels = isLowPowerDevice
+      ? Array.from({ length: 7 }, (_, modelIndex) => {
+          if (modelIndex === 0) return sourceModel;
+          const model = sourceModel.clone(true);
+          model.updateMatrixWorld(true);
+          return model;
+        })
+      : gltfs.map((loaded, modelIndex) => {
+          const model = loaded.scene;
 
-      if (modelIndex === 0) {
-        return sourceModel;
-      }
+          if (modelIndex === 0) {
+            return sourceModel;
+          }
 
-      const modelBox = new THREE.Box3().setFromObject(model);
-      const modelCenter = new THREE.Vector3();
-      const modelSizeVector = new THREE.Vector3();
-      modelBox.getCenter(modelCenter);
-      modelBox.getSize(modelSizeVector);
+          const modelBox = new THREE.Box3().setFromObject(model);
+          const modelCenter = new THREE.Vector3();
+          const modelSizeVector = new THREE.Vector3();
+          modelBox.getCenter(modelCenter);
+          modelBox.getSize(modelSizeVector);
 
-      model.position.sub(modelCenter);
-      model.updateMatrixWorld(true);
+          model.position.sub(modelCenter);
+          model.updateMatrixWorld(true);
 
-      const modelMaxDim = Math.max(
-        modelSizeVector.x,
-        modelSizeVector.y,
-        modelSizeVector.z
-      );
-      const uniformScale = modelMaxDim > 0 ? maxDim / modelMaxDim : 1;
-      model.scale.setScalar(uniformScale);
-      model.updateMatrixWorld(true);
+          const modelMaxDim = Math.max(
+            modelSizeVector.x,
+            modelSizeVector.y,
+            modelSizeVector.z
+          );
+          const uniformScale = modelMaxDim > 0 ? maxDim / modelMaxDim : 1;
+          model.scale.setScalar(uniformScale);
+          model.updateMatrixWorld(true);
 
-      const scaledBox = new THREE.Box3().setFromObject(model);
-      const scaledCenter = new THREE.Vector3();
-      scaledBox.getCenter(scaledCenter);
-      model.position.sub(scaledCenter);
-      model.updateMatrixWorld(true);
+          const scaledBox = new THREE.Box3().setFromObject(model);
+          const scaledCenter = new THREE.Vector3();
+          scaledBox.getCenter(scaledCenter);
+          model.position.sub(scaledCenter);
+          model.updateMatrixWorld(true);
 
-      return model;
-    });
+          return model;
+        });
 
     modelSize = maxDim;
 
@@ -1438,55 +1463,71 @@ Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
       instanceRoot.userData.chairState = chairState;
 
       const modelClone = arraySourceModels[layout.modelIndex].clone(true);
-      instanceGroup.add(modelClone);
-      splitToTriangles(modelClone, instanceGroup, layout.material, instanceRoot);
-      instanceGroup.remove(modelClone);
+
+      if (isLowPowerDevice) {
+        modelClone.traverse((object) => {
+          if (!object.isMesh) return;
+          object.material = layout.material;
+          object.castShadow = false;
+          object.receiveShadow = false;
+          object.userData.instanceRoot = instanceRoot;
+          chairPickMeshes.push(object);
+        });
+        instanceGroup.add(modelClone);
+      } else {
+        instanceGroup.add(modelClone);
+        splitToTriangles(modelClone, instanceGroup, layout.material, instanceRoot);
+        instanceGroup.remove(modelClone);
+      }
 
       // 每把椅子下方放置独立正方形镜面。
-      const mirrorMetric = arrayModelMetrics[layout.modelIndex];
-      const mirrorGeometry = new THREE.PlaneGeometry(
-        mirrorMetric.mirrorSize,
-        mirrorMetric.mirrorSize
-      );
-      const mirror = new Reflector(mirrorGeometry, {
-        clipBias: 0.001,
-        textureWidth: getMirrorTextureSize(),
-        textureHeight: getMirrorTextureSize(),
-        color: 0xf7fbff,
-        multisample: renderer.capabilities.isWebGL2 ? 4 : 0
-      });
-      mirror.rotation.x = -Math.PI / 2;
-      mirror.position.set(0, mirrorMetric.floorY - size.y * 0.006, 0);
-      mirror.renderOrder = 1;
-      const mirrorRenderTarget = mirror.getRenderTarget();
-      mirrorRenderTarget.texture.minFilter = THREE.LinearFilter;
-      mirrorRenderTarget.texture.magFilter = THREE.LinearFilter;
-      mirrorRenderTarget.texture.generateMipmaps = false;
-      if (renderer.capabilities.isWebGL2) {
-        mirrorRenderTarget.samples = 4;
+      if (!isLowPowerDevice) {
+        // 每把椅子下方放置独立正方形镜面。
+        const mirrorMetric = arrayModelMetrics[layout.modelIndex];
+        const mirrorGeometry = new THREE.PlaneGeometry(
+          mirrorMetric.mirrorSize,
+          mirrorMetric.mirrorSize
+        );
+        const mirror = new Reflector(mirrorGeometry, {
+          clipBias: 0.001,
+          textureWidth: getMirrorTextureSize(),
+          textureHeight: getMirrorTextureSize(),
+          color: 0xf7fbff,
+          multisample: renderer.capabilities.isWebGL2 ? 4 : 0
+        });
+        mirror.rotation.x = -Math.PI / 2;
+        mirror.position.set(0, mirrorMetric.floorY - size.y * 0.006, 0);
+        mirror.renderOrder = 1;
+        const mirrorRenderTarget = mirror.getRenderTarget();
+        mirrorRenderTarget.texture.minFilter = THREE.LinearFilter;
+        mirrorRenderTarget.texture.magFilter = THREE.LinearFilter;
+        mirrorRenderTarget.texture.generateMipmaps = false;
+        if (renderer.capabilities.isWebGL2) {
+          mirrorRenderTarget.samples = 4;
+        }
+        mirror.userData.chairState = chairState;
+        instanceGroup.add(mirror);
+        chairMirrors.push(mirror);
+
+        // 反射时临时切换为蓝天背景，并隐藏其他镜子，避免镜面之间递归反射。
+        const originalMirrorRender = mirror.onBeforeRender.bind(mirror);
+        mirror.onBeforeRender = function (...args) {
+          const previousBackground = scene.background;
+          const previousVisibility = chairMirrors.map((item) => item.visible);
+
+          scene.background = skyReflectionTexture;
+          for (let i = 0; i < chairMirrors.length; i++) {
+            chairMirrors[i].visible = chairMirrors[i] === mirror;
+          }
+
+          originalMirrorRender(...args);
+
+          scene.background = previousBackground;
+          for (let i = 0; i < chairMirrors.length; i++) {
+            chairMirrors[i].visible = previousVisibility[i];
+          }
+        };
       }
-      mirror.userData.chairState = chairState;
-      instanceGroup.add(mirror);
-      chairMirrors.push(mirror);
-
-      // 反射时临时切换为蓝天背景，并隐藏其他镜子，避免镜面之间递归反射。
-      const originalMirrorRender = mirror.onBeforeRender.bind(mirror);
-      mirror.onBeforeRender = function (...args) {
-        const previousBackground = scene.background;
-        const previousVisibility = chairMirrors.map((item) => item.visible);
-
-        scene.background = skyReflectionTexture;
-        for (let i = 0; i < chairMirrors.length; i++) {
-          chairMirrors[i].visible = chairMirrors[i] === mirror;
-        }
-
-        originalMirrorRender(...args);
-
-        scene.background = previousBackground;
-        for (let i = 0; i < chairMirrors.length; i++) {
-          chairMirrors[i].visible = previousVisibility[i];
-        }
-      };
 
       const serialLabel = createSerialNumberLabel(chairInstances.length + 1);
       chairState.serialLabel = serialLabel;
@@ -1710,6 +1751,7 @@ function splitToTriangles(root, targetGroup, baseMaterial, instanceRoot) {
       }
 
       targetGroup.add(mesh);
+      chairPickMeshes.push(mesh);
       triMeshes.push({
         mesh,
         origCenter,           // 世界空间原始中心（t=0）
@@ -1773,10 +1815,7 @@ renderer.domElement.addEventListener('click', (event) => {
   );
 
   raycaster.setFromCamera(_pickPointer, camera);
-  const hits = raycaster.intersectObjects(
-    triMeshes.map((tri) => tri.mesh),
-    false
-  );
+  const hits = raycaster.intersectObjects(chairPickMeshes, false);
 
   if (hits.length === 0) return;
 
@@ -1826,6 +1865,11 @@ window.addEventListener('wheel', (event) => {
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(
+    isLowPowerDevice
+      ? Math.min(window.devicePixelRatio, 1.2)
+      : Math.min(window.devicePixelRatio, 2)
+  );
   renderer.setSize(window.innerWidth, window.innerHeight);
   for (let i = 0; i < chairMirrors.length; i++) {
     const renderTarget = chairMirrors[i].getRenderTarget?.();
