@@ -1333,6 +1333,68 @@ mobileLoadingNotice.style.cssText = [
 if (isLowPowerDevice) document.body.appendChild(mobileLoadingNotice);
 const loader = new GLTFLoader();
 
+let loadedHeroSource = null;
+
+function renderEmergencyHero(sourceModel, reason) {
+  console.warn('启用首椅保底渲染：', reason);
+
+  while (chairRoot.children.length > 0) {
+    chairRoot.remove(chairRoot.children[0]);
+  }
+  chairInstances.length = 0;
+  chairPickMeshes.length = 0;
+  triMeshes.length = 0;
+
+  const emergencyModel = sourceModel.clone(true);
+  emergencyModel.updateMatrixWorld(true);
+
+  const emergencyBox = new THREE.Box3().setFromObject(emergencyModel);
+  const emergencyCenter = emergencyBox.getCenter(new THREE.Vector3());
+  emergencyModel.position.sub(emergencyCenter);
+  emergencyModel.updateMatrixWorld(true);
+
+  const emergencySize = new THREE.Vector3();
+  new THREE.Box3().setFromObject(emergencyModel).getSize(emergencySize);
+  chairModelSize.copy(emergencySize);
+  modelSize = Math.max(emergencySize.x, emergencySize.y, emergencySize.z);
+
+  emergencyModel.traverse((object) => {
+    if (!object.isMesh) return;
+    object.material = chairMaterial;
+    object.castShadow = false;
+    object.receiveShadow = false;
+    object.userData.instanceRoot = null;
+  });
+
+  chairRoot.add(emergencyModel);
+  chairRoot.position.set(0, 0, 0);
+  chairRoot.scale.setScalar(1);
+  chairRoot.visible = true;
+
+  const fov = THREE.MathUtils.degToRad(camera.fov);
+  const verticalDistance =
+    emergencySize.y / (2 * Math.tan(fov / 2) * 0.72);
+  const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * camera.aspect);
+  const horizontalDistance =
+    emergencySize.x / (2 * Math.tan(horizontalFov / 2) * 0.72);
+  const distance = Math.max(verticalDistance, horizontalDistance, 1);
+
+  camera.position.set(0, emergencySize.y * 0.06, distance);
+  camera.lookAt(0, 0, 0);
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  heroModelReady = true;
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+  renderer.render(scene, camera);
+
+  if (mobileLoadingNotice.isConnected) {
+    mobileLoadingNotice.style.opacity = '0';
+    window.setTimeout(() => mobileLoadingNotice.remove(), 220);
+  }
+}
+
 // 首屏只加载 chair.glb；其余造型在首屏已经显示后再后台逐个加载。
 const heroModelPath = new URL('./chair.glb', import.meta.url).href;
 const deferredChairModelPaths = [
@@ -1383,6 +1445,7 @@ function normalizeModelToReference(model, referenceMaxDim) {
 loader.loadAsync(heroModelPath)
   .then((heroGltf) => {
     const sourceModel = heroGltf.scene;
+    loadedHeroSource = sourceModel;
 
     const box = new THREE.Box3().setFromObject(sourceModel);
     const center = new THREE.Vector3();
@@ -1766,14 +1829,25 @@ loader.loadAsync(heroModelPath)
     console.log(`金色椅子加载成功，独立三角面总数: ${triMeshes.length}`);
   })
   .catch((err) => {
-    console.error('首屏椅子模型加载失败:', err);
-    if (mobileLoadingNotice.isConnected) {
-      mobileLoadingNotice.textContent = '3D LOAD FAILED';
-      mobileLoadingNotice.style.color = '#c00';
+    console.error('3D 初始化流程失败:', err);
+
+    if (loadedHeroSource) {
+      renderEmergencyHero(loadedHeroSource, err);
+      return;
     }
+
+    if (mobileLoadingNotice.isConnected) {
+      mobileLoadingNotice.textContent = `3D LOAD FAILED: ${err?.message || err}`;
+      mobileLoadingNotice.style.color = '#c00';
+      mobileLoadingNotice.style.maxWidth = '82vw';
+      mobileLoadingNotice.style.textAlign = 'center';
+      mobileLoadingNotice.style.lineHeight = '1.45';
+      mobileLoadingNotice.style.whiteSpace = 'normal';
+    }
+
     const message = document.createElement('div');
-    message.textContent = '椅子模型加载失败，请检查文件名和浏览器控制台';
-    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:10;';
+    message.textContent = `椅子模型加载失败：${err?.message || err}`;
+    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:61;';
     document.body.appendChild(message);
   });
 
@@ -2010,6 +2084,14 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const elapsed = clock.getElapsedTime();
+
+  if (!heroModelReady) {
+    controls.update();
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.render(scene, camera);
+    return;
+  }
 
   if (certificateMode && certificateChair) {
     for (let i = 0; i < chairInstances.length; i++) {
