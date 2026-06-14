@@ -1,0 +1,2313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chair</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      background: #ffffff;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 500vh;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+      z-index: 1;
+    }
+
+    .scroll-track {
+      position: relative;
+      height: auto;
+      pointer-events: none;
+    }
+
+    .scroll-panel {
+      height: 100vh;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+
+    .page-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111111;
+    }
+
+    .gallery-brand {
+      position: absolute;
+      top: 28px;
+      left: 52px;
+    }
+
+
+    .gallery-brand img {
+      display: block;
+      width: 150px;
+      height: auto;
+    }
+
+    .chair-brand {
+      position: absolute;
+      left: 52px;
+      bottom: 27px;
+    }
+
+
+
+    .chair-brand img {
+      display: block;
+      width: 150px;
+      height: auto;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      right: 34px;
+      bottom: 27px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .gallery-brand,
+    .chair-brand,
+    .scroll-hint {
+      transition: opacity 220ms ease;
+    }
+
+    .page-ui.is-carousel-screen .gallery-brand,
+    .page-ui.is-carousel-screen .chair-brand,
+    .page-ui.is-carousel-screen .scroll-hint {
+      opacity: 0;
+    }
+
+    .serial-number-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 11;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .serial-number {
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #000000;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.045em;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      will-change: left, top, opacity;
+    }
+
+    .final-intro {
+      position: fixed;
+      left: 52px;
+      right: 52px;
+      bottom: 82px;
+      z-index: 0;
+      color: #000000;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: clamp(34px, 3.7vw, 68px);
+      font-weight: 800;
+      line-height: 0.98;
+      letter-spacing: -0.045em;
+      text-transform: uppercase;
+      white-space: pre-line;
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 220ms linear, transform 320ms ease;
+      pointer-events: none;
+      max-width: calc(100vw - 104px);
+    }
+
+    .final-intro.is-visible {
+      transform: translateY(0);
+    }
+
+    .carousel-title {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 18px;
+      color: #201616;
+      font-family: Arial, Helvetica, sans-serif;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 260ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .carousel-title.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .carousel-title__line--primary {
+      font-size: clamp(52px, 7.2vw, 118px);
+      font-weight: 700;
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+      white-space: nowrap;
+    }
+
+    .carousel-title__line--secondary {
+      margin-top: 18px;
+      font-size: clamp(44px, 6vw, 96px);
+      font-weight: 400;
+      line-height: 0.9;
+      letter-spacing: -0.055em;
+      white-space: nowrap;
+    }
+
+    .signature-panel {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 12;
+      width: min(34vw, 360px);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(var(--signature-scale, 0.86));
+      transform-origin: center;
+      pointer-events: none;
+      will-change: left, top, opacity, transform;
+    }
+
+    .signature-panel img {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.12));
+      opacity: 0.86;
+    }
+
+    .screen-progress {
+      position: fixed;
+      right: 18px;
+      top: 50%;
+      z-index: 20;
+      width: 4px;
+      height: 220px;
+      transform: translateY(-50%);
+      background: #d7dbe0;
+      pointer-events: auto;
+    }
+
+    .screen-progress__thumb {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 4px;
+      height: 44px;
+      background: #06142b;
+      transform: translateY(0);
+      transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+
+    .screen-progress__hit {
+      position: absolute;
+      left: -10px;
+      width: 24px;
+      height: 20%;
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .screen-progress__hit:nth-child(2) { top: 0; }
+    .screen-progress__hit:nth-child(3) { top: 20%; }
+    .screen-progress__hit:nth-child(4) { top: 40%; }
+    .screen-progress__hit:nth-child(5) { top: 60%; }
+    .screen-progress__hit:nth-child(6) { top: 80%; }
+
+    .chair-carousel-controls {
+      position: fixed;
+      inset: 0;
+      z-index: 24;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+
+    .chair-carousel-controls.is-visible { opacity: 1; }
+
+    .chair-carousel-button {
+      position: absolute;
+      top: 50%;
+      width: 72px;
+      height: 120px;
+      transform: translateY(-50%);
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: #111111;
+      font: 300 74px/1 Arial, Helvetica, sans-serif;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .chair-carousel-button:disabled {
+      opacity: 0.18;
+      cursor: default;
+    }
+
+    .chair-carousel-button--previous { left: 24px; }
+    .chair-carousel-button--next { right: 24px; }
+
+    .certificate-page {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: block;
+      background: #ffffff;
+      color: #111111;
+      font-family: Arial, Helvetica, sans-serif;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 280ms ease, visibility 0s linear 280ms;
+      overflow: hidden;
+    }
+
+    .certificate-page.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition-delay: 0s;
+    }
+
+    .certificate-column {
+      position: absolute;
+      z-index: 2;
+      min-width: 0;
+    }
+
+    .certificate-left {
+      inset: 0;
+      display: block;
+    }
+
+    .certificate-heading-button {
+      position: absolute;
+      left: 14.7vw;
+      top: 54px;
+      width: max-content;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: #111111;
+      font: 800 clamp(30px, 2.25vw, 40px)/0.96 Arial, Helvetica, sans-serif;
+      letter-spacing: -0.05em;
+      text-align: left;
+      cursor: pointer;
+      z-index: 3;
+    }
+
+    .certificate-logo {
+      position: absolute;
+      left: 52px;
+      top: 28px;
+      width: 150px;
+      height: auto;
+      margin: 0;
+      z-index: 3;
+    }
+
+    .certificate-label {
+      position: absolute;
+      left: 4.05vw;
+      margin: 0;
+      color: #9b9b9b;
+      font-size: clamp(25px, 1.8vw, 32px);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.035em;
+      z-index: 3;
+    }
+
+    .certificate-label--collector {
+      top: 22.7vh;
+    }
+
+    .certificate-label--artist {
+      left: 7.7vw;
+      top: 62.2vh;
+    }
+
+    .collector-signature-box {
+      position: fixed;
+      left: 4.05vw;
+      top: 29.6vh;
+      width: 30.9vw;
+      height: 22.4vh;
+      min-width: 380px;
+      max-width: 500px;
+      min-height: 175px;
+      max-height: 220px;
+      border: 1px solid #ececec;
+      background: transparent;
+      overflow: hidden;
+      z-index: 42;
+      touch-action: none;
+      cursor: crosshair;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 180ms ease, visibility 0s linear 180ms;
+    }
+
+    .collector-signature-box::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: url('./签名板.png') center / cover no-repeat;
+      opacity: 0.58;
+      pointer-events: none;
+    }
+
+    body.is-certificate-open .collector-signature-box {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition-delay: 0s;
+    }
+
+    .collector-signature-canvas {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      touch-action: none;
+    }
+
+    .collector-signature-placeholder {
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      color: #d3d3d3;
+      font-size: 22px;
+      line-height: 1.25;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+      z-index: 2;
+    }
+
+    .collector-signature-box.has-signature .collector-signature-placeholder {
+      opacity: 0;
+    }
+
+    .collector-signature-clear {
+      position: absolute;
+      right: 10px;
+      bottom: 8px;
+      border: 0;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #b8b8b8;
+      font: 700 10px/1 Arial, Helvetica, sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 160ms ease;
+      z-index: 2;
+    }
+
+    .collector-signature-box.has-signature .collector-signature-clear {
+      opacity: 1;
+    }
+
+    .artist-signature-image {
+      position: absolute;
+      left: 7.7vw;
+      top: 64.2vh;
+      display: block;
+      width: min(25vw, 390px);
+      height: auto;
+      margin: 0;
+      object-fit: contain;
+      object-position: left center;
+      z-index: 3;
+    }
+
+    .certificate-model-stage {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .certificate-right {
+      position: absolute;
+      left: 68.8vw;
+      top: 6.5vh;
+      width: 26.8vw;
+      display: block;
+      padding: 0;
+      color: #d3d3d3;
+      font-size: clamp(27px, 2.15vw, 39px);
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -0.045em;
+      text-transform: uppercase;
+      white-space: pre-line;
+      z-index: 2;
+    }
+
+    .certificate-info-block + .certificate-info-block {
+      margin-top: 5.8vh;
+    }
+
+    .certificate-footer {
+      position: absolute;
+      right: 3.9vw;
+      bottom: 3.4vh;
+      color: #111111;
+      font-size: clamp(15px, 1.08vw, 18px);
+      font-weight: 700;
+      line-height: 1.15;
+      text-align: right;
+      z-index: 3;
+    }
+
+    .certificate-close-hint {
+      display: none;
+    }
+
+    body.is-certificate-open {
+      overflow: hidden;
+    }
+
+    body.is-certificate-open > canvas {
+      z-index: 41;
+      pointer-events: none;
+    }
+
+    body.is-certificate-open .page-ui,
+    body.is-certificate-open .carousel-title,
+    body.is-certificate-open .final-intro {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    @media (max-width: 900px) {
+      .certificate-page {
+        overflow-y: auto;
+      }
+
+      .certificate-logo {
+        left: 52px;
+        top: 52px;
+        width: 110px;
+        transform: translateY(-18px);
+      }
+
+      .certificate-heading-button {
+        left: 206px;
+        top: 52px;
+        width: 150px;
+        font-size: clamp(20px, 2.8vw, 27px);
+        line-height: 0.96;
+        letter-spacing: -0.045em;
+        white-space: normal;
+        transform: none;
+      }
+
+      .certificate-label--collector {
+        left: 52px;
+        top: 210px;
+      }
+
+      .collector-signature-box {
+        left: 52px;
+        top: 272px;
+        width: min(31vw, 500px);
+        min-width: 0;
+        max-width: 500px;
+        height: auto;
+        aspect-ratio: 500 / 220;
+      }
+
+      .collector-signature-box::before {
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        opacity: 0.42;
+      }
+
+      .collector-signature-placeholder {
+        color: rgba(211, 211, 211, 0.72);
+      }
+
+      .certificate-label--artist {
+        left: 52px;
+        top: 575px;
+      }
+
+      .artist-signature-image {
+        left: 78px;
+        top: 620px;
+        width: min(25vw, 360px);
+      }
+
+      .certificate-right {
+        left: 68.5vw;
+        top: 52px;
+        width: 28vw;
+        padding-bottom: 120px;
+        font-size: clamp(34px, 4.9vw, 48px);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+        transform: none;
+      }
+
+      .certificate-footer {
+        right: 20px;
+        bottom: 18px;
+      }
+    }
+
+    @media (min-width: 701px) and (max-width: 900px) {
+      .certificate-info-block + .certificate-info-block {
+        margin-top: 5.2vh;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .gallery-brand {
+        top: 18px;
+        left: 18px;
+      }
+
+      .gallery-brand img {
+        width: 112px;
+      }
+
+      .chair-brand {
+        left: 18px;
+        bottom: 18px;
+      }
+
+      .chair-brand img {
+        width: 112px;
+      }
+
+      .scroll-hint {
+        right: 18px;
+        bottom: 18px;
+        font-size: 10px;
+      }
+      .serial-number {
+        font-size: 38px;
+      }
+
+      .final-intro {
+        left: 18px;
+        right: 18px;
+        bottom: 72px;
+        font-size: clamp(24px, 7vw, 40px);
+        max-width: calc(100vw - 36px);
+      }
+
+      .signature-panel {
+        width: min(68vw, 260px);
+      }
+
+      .carousel-title {
+        padding-top: 42px;
+      }
+
+      .carousel-title__line--primary {
+        font-size: clamp(34px, 10vw, 54px);
+      }
+
+      .carousel-title__line--secondary {
+        margin-top: 10px;
+        font-size: clamp(28px, 8.5vw, 46px);
+      }
+
+      .screen-progress {
+        right: 10px;
+        height: 160px;
+      }
+
+      .screen-progress__thumb {
+        height: 32px;
+      }
+    }
+
+
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div class="carousel-title" id="carouselTitle" aria-hidden="true">
+    <div class="carousel-title__line carousel-title__line--primary">“Let Life In And Out Of Art”</div>
+    <div class="carousel-title__line carousel-title__line--secondary">IN&amp;OUT ©.2021</div>
+  </div>
+  <div class="page-ui" id="pageUi" aria-hidden="true">
+    <div class="gallery-brand">
+      <img src="./gallery-logo.svg" alt="" />
+    </div>
+
+    <div class="chair-brand">
+      <img src="./chair-logo.svg" alt="" />
+    </div>
+
+    <div class="scroll-hint">SCROLL DOWN TO DISCOVER MORE</div>
+    <div class="serial-number-layer" id="serialNumberLayer"></div>
+
+    <div class="signature-panel" id="signaturePanel">
+      <img src="./signature2.png" alt="Artist signature" />
+    </div>
+
+    <div class="screen-progress" id="screenProgress">
+      <div class="screen-progress__thumb" id="screenProgressThumb"></div>
+      <button class="screen-progress__hit" type="button" data-screen="0" aria-label="Go to screen 1"></button>
+      <button class="screen-progress__hit" type="button" data-screen="1" aria-label="Go to screen 2"></button>
+      <button class="screen-progress__hit" type="button" data-screen="2" aria-label="Go to screen 3"></button>
+      <button class="screen-progress__hit" type="button" data-screen="3" aria-label="Go to screen 4"></button>
+      <button class="screen-progress__hit" type="button" data-screen="4" aria-label="Go to screen 5"></button>
+    </div>
+    <div class="chair-carousel-controls" id="chairCarouselControls">
+      <button class="chair-carousel-button chair-carousel-button--previous" id="previousChairButton" type="button" aria-label="Previous chair">&lt;</button>
+      <button class="chair-carousel-button chair-carousel-button--next" id="nextChairButton" type="button" aria-label="Next chair">&gt;</button>
+    </div>
+  </div>
+  <div class="final-intro" id="finalIntro"></div>
+  <section class="certificate-page" id="certificatePage" aria-hidden="true">
+    <div class="certificate-column certificate-left">
+      <img class="certificate-logo" src="./gallery-logo.svg" alt="IN&OUT" />
+      <button class="certificate-heading-button" id="certificateBackButton" type="button" aria-label="Back to chair carousel">COLLECTION<br />INTENT</button>
+      <div class="certificate-close-hint">Click title to return</div>
+
+      <div class="certificate-label certificate-label--collector">@ COLLECTOR</div>
+
+      <div class="certificate-label certificate-label--artist">@ ARTIST</div>
+      <img class="artist-signature-image" src="./signature2.png" alt="Artist signature" />
+    </div>
+
+    <div class="certificate-model-stage" aria-hidden="true"></div>
+
+    <div class="certificate-column certificate-right">
+      <div class="certificate-info-block" id="certificateIdentity"></div>
+      <div class="certificate-info-block" id="certificateDimensions"></div>
+      <div class="certificate-info-block" id="certificateWeight"></div>
+      <div class="certificate-info-block" id="certificateMaterial"></div>
+    </div>
+
+    <div class="certificate-footer">“Let Life In And Out Of Art”<br />IN&amp;OUT ©.2021</div>
+  </section>
+  <div class="collector-signature-box" id="collectorSignatureBox" aria-label="Collector signature area">
+    <canvas class="collector-signature-canvas" id="collectorSignatureCanvas"></canvas>
+    <div class="collector-signature-placeholder">SIGN HERE TO RESERVE</div>
+    <button class="collector-signature-clear" id="collectorSignatureClear" type="button">Clear</button>
+  </div>
+  <div class="scroll-track" aria-hidden="true">
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ─── 可调参数 ────────────────────────────────────────────────────────────────
+const CONFIG = {
+  modelPath:         new URL('./chair.glb', import.meta.url).href,
+  modelScreenHeight:  0.65,
+  floatAmplitude:     0.0,
+  floatSpeed:         0.7,
+  repelRadius:        0.86,
+  repelStrength:      0.42,
+  arrayRepelRadius:   3.40,
+  arrayRepelStrength: 0.54,
+  arrayRotationStrength: 0.22,
+  rotationStrength:   0.16,
+  rotationEase:       0.10,
+  returnEase:         0.12,
+  pointerEase:        0.22
+};
+
+
+// ─── 渲染器 ──────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ─── 场景 / 相机 ─────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = null;
+
+// 中性摄影棚环境反射，让银灰金属呈现真实高光与明暗层次
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+const roomEnvironment = new RoomEnvironment();
+scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
+roomEnvironment.dispose();
+pmremGenerator.dispose();
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+
+// ─── 视角控制：滚动负责场景过渡，右键仍可自由旋转视角 ────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enabled = true;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.enableZoom = false;
+controls.enableRotate = true;
+controls.target.set(0, 0, 0);
+controls.mouseButtons.LEFT = null;
+controls.mouseButtons.MIDDLE = null;
+controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+
+// ─── 灯光 ────────────────────────────────────────────────────────────────────
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x9a9a9a, 0.5);
+scene.add(hemiLight);
+
+// 低角度太阳光：从画面左上方斜射，形成清晰而较长的落地投影
+const topLight = new THREE.DirectionalLight(0xffffff, 4.4);
+topLight.position.set(-12, 9, 10);
+topLight.target.position.set(0, 0, 0);
+topLight.castShadow = true;
+topLight.shadow.mapSize.set(2048, 2048);
+topLight.shadow.camera.near = 0.1;
+topLight.shadow.camera.far = 120;
+topLight.shadow.bias = -0.00035;
+topLight.shadow.normalBias = 0.025;
+topLight.shadow.radius = 3.5;
+scene.add(topLight);
+scene.add(topLight.target);
+
+const frontFill = new THREE.DirectionalLight(0xdfe5e8, 0.65);
+frontFill.position.set(2.5, 1.8, 4.5);
+scene.add(frontFill);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.9);
+rimLight.position.set(-3, 3.5, -4);
+scene.add(rimLight);
+
+// ─── 层级：chairRoot 做悬浮 Y 偏移，chairGroup 存放三角面 ────────────────────
+const chairRoot  = new THREE.Group();
+const chairGroup = new THREE.Group();
+chairRoot.add(chairGroup);
+scene.add(chairRoot);
+
+// ─── 鼠标交互用的不可见平面（法线朝相机，即 +Z 方向；平面 z=0 恒不变）──────
+// camera 在 z 轴正方向，模型中心在原点，z=0 平面是最合理的交互面
+const hitPlane   = new THREE.Plane();
+const _cameraDir = new THREE.Vector3();
+const raycaster  = new THREE.Raycaster();
+const _hitResult = new THREE.Vector3(); // intersectPlane 复用目标
+
+// ─── 运行时状态 ──────────────────────────────────────────────────────────────
+let triMeshes          = [];   // { mesh, origCenter, faceNormal, currentOffset, targetOffset }
+let modelSize          = 1;    // 包围盒最大维度（世界单位）
+let floatAmplitudeWorld= 0.1;  // 悬浮幅度（世界单位）
+let chairModelSize = new THREE.Vector3(1, 1, 1);
+
+let scrollProgress = 0;
+let lastAppliedScrollProgress = -1;
+
+const closeCameraPosition = new THREE.Vector3();
+const closeCameraTarget = new THREE.Vector3();
+const frontCameraPosition = new THREE.Vector3();
+const frontCameraTarget = new THREE.Vector3();
+const middleCameraPosition = new THREE.Vector3();
+const middleCameraTarget = new THREE.Vector3();
+const arrayCameraPosition = new THREE.Vector3();
+const arrayCameraTarget = new THREE.Vector3();
+const finalChairCameraPosition = new THREE.Vector3();
+const finalChairCameraTarget = new THREE.Vector3();
+const carouselCameraPosition = new THREE.Vector3();
+const carouselCameraTarget = new THREE.Vector3();
+const currentCameraPosition = new THREE.Vector3();
+const currentCameraTarget = new THREE.Vector3();
+
+const mouse2D      = new THREE.Vector2(-9999, -9999); // NDC
+const mouse3D      = new THREE.Vector3();              // 平滑后的 3D 鼠标位置
+const mouse3DTarget= new THREE.Vector3();              // 射线命中目标
+let   mouseOnCanvas= false;
+let   isOrbiting   = false;
+
+// 每帧复用的临时向量，避免 GC
+const _worldPos = new THREE.Vector3();
+const _diff     = new THREE.Vector3();
+const _repelDir = new THREE.Vector3();
+const _serialWorldPos = new THREE.Vector3();
+const _serialScreenPos = new THREE.Vector3();
+const _origin = new THREE.Vector3(0, 0, 0);
+const _pickPointer = new THREE.Vector2();
+
+// 生成细密、低对比度的金属颗粒纹理，用于微表面粗糙度和极轻微凹凸
+const metalGrainCanvas = document.createElement('canvas');
+metalGrainCanvas.width = 512;
+metalGrainCanvas.height = 512;
+const grainCtx = metalGrainCanvas.getContext('2d');
+const grainImage = grainCtx.createImageData(512, 512);
+
+for (let i = 0; i < grainImage.data.length; i += 4) {
+  const fineNoise = 38 + Math.random() * 176;
+  const occasionalSpark = Math.random() > 0.965 ? 38 + Math.random() * 44 : 0;
+  const value = Math.min(255, fineNoise + occasionalSpark);
+  grainImage.data[i] = value;
+  grainImage.data[i + 1] = value;
+  grainImage.data[i + 2] = value;
+  grainImage.data[i + 3] = 255;
+}
+
+grainCtx.putImageData(grainImage, 0, 0);
+
+const metalGrainTexture = new THREE.CanvasTexture(metalGrainCanvas);
+metalGrainTexture.wrapS = THREE.RepeatWrapping;
+metalGrainTexture.wrapT = THREE.RepeatWrapping;
+metalGrainTexture.repeat.set(18, 18);
+metalGrainTexture.colorSpace = THREE.NoColorSpace;
+metalGrainTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+const goldMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xb78b32,
+  metalness: 0.96,
+  roughness: 0.23,
+  roughnessMap: metalGrainTexture,
+  bumpMap: metalGrainTexture,
+  bumpScale: 0.014,
+  clearcoat: 0.46,
+  clearcoatRoughness: 0.08,
+  envMapIntensity: 2.0,
+  flatShading: true,
+  side: THREE.DoubleSide
+});
+const chairMaterial = goldMaterial;
+const chairInstances = [];
+
+
+const chairMirrors = [];
+
+function getMirrorTextureSize() {
+  const longestSide = Math.max(window.innerWidth, window.innerHeight);
+  return Math.min(
+    1536,
+    Math.max(1024, Math.round(longestSide * window.devicePixelRatio * 0.85))
+  );
+}
+
+// 仅供镜面反射使用的黑色背景；主场景仍保持透明，由网页白色背景显示。
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 1024;
+skyCanvas.height = 512;
+const skyCtx = skyCanvas.getContext('2d');
+skyCtx.fillStyle = '#000000';
+skyCtx.fillRect(0, 0, skyCanvas.width, skyCanvas.height);
+
+const skyReflectionTexture = new THREE.CanvasTexture(skyCanvas);
+skyReflectionTexture.colorSpace = THREE.SRGBColorSpace;
+skyReflectionTexture.mapping = THREE.EquirectangularReflectionMapping;
+skyReflectionTexture.needsUpdate = true;
+
+// 受斥力影响的碎片改为纯白非金属材质，只保留自然明度、阴影与少量表面高光
+
+const whiteFragmentMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  metalness: 0.0,
+  roughness: 0.42,
+  clearcoat: 0.12,
+  clearcoatRoughness: 0.3,
+  envMapIntensity: 0.65,
+  flatShading: true,
+  side: THREE.DoubleSide
+});
+
+// ─── 椅子序列编号 ────────────────────────────────────────────────────────────
+// 编号隐藏在椅子内部，只有面片被斥力拆散后才逐渐显现。
+function createSerialNumberLabel(number) {
+  const element = document.createElement('div');
+  element.className = 'serial-number';
+  element.textContent = String(number).padStart(3, '0');
+  document.getElementById('serialNumberLayer').appendChild(element);
+  return element;
+}
+
+// ─── 最后一屏文字：读取同目录 intro.rtf ─────────────────────────────────────
+const finalIntro = document.getElementById('finalIntro');
+const carouselTitle = document.getElementById('carouselTitle');
+const pageUi = document.getElementById('pageUi');
+const signaturePanel = document.getElementById('signaturePanel');
+const screenProgress = document.getElementById('screenProgress');
+const screenProgressThumb = document.getElementById('screenProgressThumb');
+const chairCarouselControls = document.getElementById('chairCarouselControls');
+const previousChairButton = document.getElementById('previousChairButton');
+const nextChairButton = document.getElementById('nextChairButton');
+const scrollPanels = Array.from(document.querySelectorAll('.scroll-panel'));
+const certificatePage = document.getElementById('certificatePage');
+const certificateBackButton = document.getElementById('certificateBackButton');
+const certificateIdentity = document.getElementById('certificateIdentity');
+const certificateDimensions = document.getElementById('certificateDimensions');
+const certificateWeight = document.getElementById('certificateWeight');
+const certificateMaterial = document.getElementById('certificateMaterial');
+const collectorSignatureBox = document.getElementById('collectorSignatureBox');
+const collectorSignatureCanvas = document.getElementById('collectorSignatureCanvas');
+const collectorSignatureClear = document.getElementById('collectorSignatureClear');
+const collectorSignatureContext = collectorSignatureCanvas.getContext('2d');
+
+let finalIntroRevealAmount = 0;
+let signatureRevealAmount = 0;
+let carouselChairIndex = 0;
+let carouselOffsetX = 0;
+let carouselTargetOffsetX = 0;
+let thirdScreenSpreadAmount = 0;
+let activeScreenIndex = 0;
+let isSnapping = false;
+let certificateMode = false;
+let certificateChair = null;
+let certificateRotation = 0;
+let isCollectorSigning = false;
+let collectorSignatureHasInk = false;
+let collectorSignatureLastX = 0;
+let collectorSignatureLastY = 0;
+function resizeCollectorSignatureCanvas() {
+  const rect = collectorSignatureBox.getBoundingClientRect();
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const previousImage = collectorSignatureHasInk
+    ? collectorSignatureCanvas.toDataURL('image/png')
+    : null;
+
+  collectorSignatureCanvas.width = Math.max(1, Math.round(rect.width * pixelRatio));
+  collectorSignatureCanvas.height = Math.max(1, Math.round(rect.height * pixelRatio));
+  collectorSignatureCanvas.style.width = `${rect.width}px`;
+  collectorSignatureCanvas.style.height = `${rect.height}px`;
+
+  collectorSignatureContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  collectorSignatureContext.lineCap = 'round';
+  collectorSignatureContext.lineJoin = 'round';
+  collectorSignatureContext.strokeStyle = '#111111';
+  collectorSignatureContext.lineWidth = 2.2;
+
+  if (previousImage) {
+    const image = new Image();
+    image.onload = () => {
+      collectorSignatureContext.drawImage(image, 0, 0, rect.width, rect.height);
+    };
+    image.src = previousImage;
+  }
+}
+
+function getCollectorSignaturePoint(event) {
+  const rect = collectorSignatureCanvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+collectorSignatureCanvas.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  isCollectorSigning = true;
+  collectorSignatureCanvas.setPointerCapture(event.pointerId);
+
+  const point = getCollectorSignaturePoint(event);
+  collectorSignatureLastX = point.x;
+  collectorSignatureLastY = point.y;
+
+  collectorSignatureContext.beginPath();
+  collectorSignatureContext.moveTo(point.x, point.y);
+  collectorSignatureContext.lineTo(point.x + 0.01, point.y + 0.01);
+  collectorSignatureContext.stroke();
+
+  collectorSignatureHasInk = true;
+  collectorSignatureBox.classList.add('has-signature');
+});
+
+collectorSignatureCanvas.addEventListener('pointermove', (event) => {
+  if (!isCollectorSigning) return;
+  event.preventDefault();
+
+  const point = getCollectorSignaturePoint(event);
+  collectorSignatureContext.beginPath();
+  collectorSignatureContext.moveTo(collectorSignatureLastX, collectorSignatureLastY);
+  collectorSignatureContext.lineTo(point.x, point.y);
+  collectorSignatureContext.stroke();
+
+  collectorSignatureLastX = point.x;
+  collectorSignatureLastY = point.y;
+});
+
+function stopCollectorSigning(event) {
+  if (!isCollectorSigning) return;
+  isCollectorSigning = false;
+
+  if (
+    event.pointerId !== undefined &&
+    collectorSignatureCanvas.hasPointerCapture(event.pointerId)
+  ) {
+    collectorSignatureCanvas.releasePointerCapture(event.pointerId);
+  }
+}
+
+collectorSignatureCanvas.addEventListener('pointerup', stopCollectorSigning);
+collectorSignatureCanvas.addEventListener('pointercancel', stopCollectorSigning);
+collectorSignatureCanvas.addEventListener('pointerleave', stopCollectorSigning);
+
+collectorSignatureClear.addEventListener('click', (event) => {
+  event.stopPropagation();
+  collectorSignatureContext.clearRect(
+    0,
+    0,
+    collectorSignatureCanvas.width,
+    collectorSignatureCanvas.height
+  );
+  collectorSignatureHasInk = false;
+  collectorSignatureBox.classList.remove('has-signature');
+});
+
+const certificateRecords = [
+  { object: 'SQN1-F2A', date: '2011', dimensions: 'L 59 CM / 23.2 IN\nD 55 CM / 21.7 IN\nH 78 CM / 30.7 IN', weight: '14KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' },
+  { object: 'SQN1-F2B', date: '2011', dimensions: 'L 61 CM / 24.0 IN\nD 57 CM / 22.4 IN\nH 80 CM / 31.5 IN', weight: '15KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' },
+  { object: 'SQN1-F2C', date: '2011', dimensions: 'L 58 CM / 22.8 IN\nD 54 CM / 21.3 IN\nH 79 CM / 31.1 IN', weight: '14KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' },
+  { object: 'SQN1-F2D', date: '2011', dimensions: 'L 60 CM / 23.6 IN\nD 56 CM / 22.0 IN\nH 78 CM / 30.7 IN', weight: '14KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' },
+  { object: 'SQN1-F2E', date: '2011', dimensions: 'L 62 CM / 24.4 IN\nD 58 CM / 22.8 IN\nH 81 CM / 31.9 IN', weight: '15KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' },
+  { object: 'SQN1-F2F', date: '2011', dimensions: 'L 57 CM / 22.4 IN\nD 53 CM / 20.9 IN\nH 77 CM / 30.3 IN', weight: '13KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' },
+  { object: 'SQN1-F2G', date: '2011', dimensions: 'L 63 CM / 24.8 IN\nD 59 CM / 23.2 IN\nH 82 CM / 32.3 IN', weight: '16KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' }
+];
+
+function openCertificate(chair) {
+  if (!chair) return;
+
+  certificateMode = true;
+  certificateChair = chair;
+  certificateRotation = 0;
+  requestAnimationFrame(resizeCollectorSignatureCanvas);
+
+  const record = certificateRecords[chair.column] || certificateRecords[0];
+  certificateIdentity.textContent = `OBJECT # ${record.object}\nDATE : ${record.date}`;
+  certificateDimensions.textContent = `DIMENSIONS :\n${record.dimensions}`;
+  certificateWeight.textContent = `WEIGHT : ${record.weight}`;
+  certificateMaterial.textContent = `MATERIAL :\n${record.material}`;
+
+  certificatePage.classList.add('is-visible');
+  certificatePage.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('is-certificate-open');
+}
+
+function closeCertificate() {
+  certificateMode = false;
+  certificatePage.classList.remove('is-visible');
+  certificatePage.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('is-certificate-open');
+
+  if (certificateChair) {
+    certificateChair.root.rotation.set(0, 0, 0);
+  }
+  certificateChair = null;
+  goToScreen(scrollPanels.length - 1, 'auto');
+}
+
+certificateBackButton.addEventListener('click', closeCertificate);
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && certificateMode) closeCertificate();
+});
+
+function updateScreenProgress(index) {
+  const maxIndex = Math.max(1, scrollPanels.length - 1);
+  const trackTravel = screenProgress.clientHeight - screenProgressThumb.clientHeight;
+  const offset = trackTravel * (index / maxIndex);
+  screenProgressThumb.style.transform = `translateY(${offset}px)`;
+}
+
+function goToScreen(index, behavior = 'smooth') {
+  const clampedIndex = THREE.MathUtils.clamp(index, 0, scrollPanels.length - 1);
+  activeScreenIndex = clampedIndex;
+  isSnapping = true;
+  window.scrollTo({
+    top: clampedIndex * window.innerHeight,
+    behavior
+  });
+  updateScreenProgress(clampedIndex);
+
+  window.setTimeout(() => {
+    isSnapping = false;
+  }, behavior === 'smooth' ? 650 : 0);
+}
+
+screenProgress.querySelectorAll('[data-screen]').forEach((button) => {
+  button.addEventListener('click', () => {
+    goToScreen(Number(button.dataset.screen));
+  });
+});
+
+function updateCarouselButtons() {
+  previousChairButton.disabled = carouselChairIndex <= 0;
+  nextChairButton.disabled = carouselChairIndex >= 6;
+}
+
+function selectCarouselChair(nextIndex) {
+  if (chairInstances.length === 0) return;
+
+  carouselChairIndex = THREE.MathUtils.clamp(nextIndex, 0, 6);
+  const middleRowChair = chairInstances.find(
+    (chair) => chair.row === 1 && chair.column === carouselChairIndex
+  );
+  if (!middleRowChair) return;
+
+  carouselTargetOffsetX = -middleRowChair.targetPosition.x;
+  updateCarouselButtons();
+}
+
+previousChairButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  selectCarouselChair(carouselChairIndex - 1);
+});
+
+nextChairButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  selectCarouselChair(carouselChairIndex + 1);
+});
+
+function decodeRtfToPlainText(rtf) {
+  let text = rtf;
+
+  // 去除常见的非正文 RTF 分组
+  text = text.replace(/\{\\(?:fonttbl|colortbl|stylesheet|info|pict)[\s\S]*?\}(?=\s*\})?/g, ' ');
+
+  // Unicode 与十六进制转义
+  text = text.replace(/\\u(-?\d+)\??/g, (_, value) => {
+    let code = Number(value);
+    if (code < 0) code += 65536;
+    return String.fromCharCode(code);
+  });
+  text = text.replace(/\\'([0-9a-fA-F]{2})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+
+  // 保留段落和换行
+  text = text.replace(/\\par[d]?\b/g, '\n');
+  text = text.replace(/\\line\b/g, '\n');
+  text = text.replace(/\\tab\b/g, ' ');
+
+  // 还原转义字符，再移除其余控制词和大括号
+  text = text.replace(/\\([\\{}])/g, '$1');
+  text = text.replace(/\\[a-zA-Z]+-?\d* ?/g, '');
+  text = text.replace(/[{}]/g, '');
+
+  const cleanedText = text
+    .replace(/\r/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // 删除 RTF 文件开头残留的控制符号，例如反斜杠、星号、方块和引号。
+  // 正文从第一个包含至少 3 个英文字母的行开始保留。
+  const lines = cleanedText.split('\n');
+  while (lines.length > 0) {
+    const letterCount = (lines[0].match(/[A-Za-z]/g) || []).length;
+    if (letterCount >= 3) break;
+    lines.shift();
+  }
+
+  return lines.join('\n').trim();
+}
+
+fetch(new URL('./intro.rtf', import.meta.url))
+  .then((response) => {
+    if (!response.ok) throw new Error(`intro.rtf HTTP ${response.status}`);
+    return response.text();
+  })
+  .then((rtf) => {
+    finalIntro.textContent = decodeRtfToPlainText(rtf);
+  })
+  .catch((error) => {
+    console.error('intro.rtf 加载失败:', error);
+  });
+
+
+// ─── 加载模型 ────────────────────────────────────────────────────────────────
+const loader = new GLTFLoader();
+
+// chair.glb 与 chair4.glb 是同一把，因此阵列只加载一份，避免重复造型。
+const chairModelPaths = [
+  './chair.glb',
+  './chair1.glb',
+  './chair2.glb',
+  './chair3.glb',
+  './chair5.glb',
+  './chair6.glb',
+  './chair7.glb'
+].map((path) => new URL(path, import.meta.url).href);
+
+Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
+  .then((gltfs) => {
+    const sourceModel = gltfs[0].scene;
+
+    const box = new THREE.Box3().setFromObject(sourceModel);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    sourceModel.position.sub(center);
+    sourceModel.updateMatrixWorld(true);
+
+    const centeredBox = new THREE.Box3().setFromObject(sourceModel);
+    const size = new THREE.Vector3();
+    centeredBox.getSize(size);
+    chairModelSize.copy(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    // 统一所有椅子模型的中心与视觉尺寸，阵列里随机使用不同造型。
+    const arraySourceModels = gltfs.map((loaded, modelIndex) => {
+      const model = loaded.scene;
+
+      if (modelIndex === 0) {
+        return sourceModel;
+      }
+
+      const modelBox = new THREE.Box3().setFromObject(model);
+      const modelCenter = new THREE.Vector3();
+      const modelSizeVector = new THREE.Vector3();
+      modelBox.getCenter(modelCenter);
+      modelBox.getSize(modelSizeVector);
+
+      model.position.sub(modelCenter);
+      model.updateMatrixWorld(true);
+
+      const modelMaxDim = Math.max(
+        modelSizeVector.x,
+        modelSizeVector.y,
+        modelSizeVector.z
+      );
+      const uniformScale = modelMaxDim > 0 ? maxDim / modelMaxDim : 1;
+      model.scale.setScalar(uniformScale);
+      model.updateMatrixWorld(true);
+
+      const scaledBox = new THREE.Box3().setFromObject(model);
+      const scaledCenter = new THREE.Vector3();
+      scaledBox.getCenter(scaledCenter);
+      model.position.sub(scaledCenter);
+      model.updateMatrixWorld(true);
+
+      return model;
+    });
+
+    modelSize = maxDim;
+
+    // 为每一种造型计算独立镜面尺寸与落地点，保证正方形刚好框住对应椅子。
+    const arrayModelMetrics = arraySourceModels.map((model) => {
+      const modelBox = new THREE.Box3().setFromObject(model);
+      const modelSizeVector = new THREE.Vector3();
+      modelBox.getSize(modelSizeVector);
+
+      return {
+        floorY: modelBox.min.y,
+        size: modelSizeVector.clone(),
+        center: modelBox.getCenter(new THREE.Vector3()),
+        mirrorSize: Math.max(modelSizeVector.x, modelSizeVector.z) * 1.32
+      };
+    });
+    floatAmplitudeWorld = size.y * CONFIG.floatAmplitude;
+
+    const columns = arraySourceModels.length;
+    const rows = 3;
+    const spacingX = size.x * 2.75;
+    const spacingZ = size.z * 2.35;
+    const layouts = [];
+
+    // 阵列只保留一排，每一种椅子恰好出现一次。
+    // 初始主椅位于中间；点击任意椅子后，它会成为新的第一屏主椅。
+    const heroRow = 1;
+    const heroColumn = Math.floor(columns / 2);
+    const modelOrder = [1, 2, 3, 0, 4, 5, 6];
+    const heroStaggerX = heroRow % 2 === 0 ? 0 : spacingX * 0.5;
+    const heroAnchorX = (heroColumn - (columns - 1) / 2) * spacingX + heroStaggerX;
+    const heroAnchorZ = (heroRow - (rows - 1) / 2) * spacingZ;
+
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < columns; column++) {
+        const staggerX = row % 2 === 0 ? 0 : spacingX * 0.5;
+        const targetPosition = new THREE.Vector3(
+          (column - (columns - 1) / 2) * spacingX + staggerX - heroAnchorX,
+          0,
+          (row - (rows - 1) / 2) * spacingZ - heroAnchorZ
+        );
+        const isHero = row === heroRow && column === heroColumn;
+        const index = row * columns + column;
+
+        layouts.push({
+          material: chairMaterial,
+          modelIndex: modelOrder[column],
+          row,
+          column,
+          startPosition: targetPosition.clone(),
+          targetPosition: targetPosition.clone(),
+          startScale: 1,
+          phase: index * 0.24,
+          isHero
+        });
+      }
+    }
+
+    layouts.forEach((layout) => {
+      const instanceRoot = new THREE.Group();
+      const instanceGroup = new THREE.Group();
+      instanceRoot.position.copy(layout.startPosition);
+      instanceRoot.scale.setScalar(layout.startScale);
+      instanceRoot.add(instanceGroup);
+      chairRoot.add(instanceRoot);
+
+      const chairState = {
+        root: instanceRoot,
+        row: layout.row,
+        column: layout.column,
+        modelIndex: layout.modelIndex,
+        modelSize: arrayModelMetrics[layout.modelIndex].size.clone(),
+        modelCenter: arrayModelMetrics[layout.modelIndex].center.clone(),
+        phase: layout.phase,
+        startPosition: layout.startPosition.clone(),
+        targetPosition: layout.targetPosition.clone(),
+        startScale: layout.startScale,
+        isHero: layout.isHero,
+        serialLabel: null,
+        serialAnchor: new THREE.Vector3(
+          0,
+          size.y * 0.43,
+          centeredBox.max.z + size.z * 0.035
+        ),
+        infoAnchor: new THREE.Vector3(
+          0,
+          size.y * 0.02,
+          centeredBox.max.z + size.z * 0.04
+        ),
+        serialInfluence: 0,
+        serialOpacity: 0
+      };
+      instanceRoot.userData.chairState = chairState;
+
+      const modelClone = arraySourceModels[layout.modelIndex].clone(true);
+      instanceGroup.add(modelClone);
+      splitToTriangles(modelClone, instanceGroup, layout.material, instanceRoot);
+      instanceGroup.remove(modelClone);
+
+      // 每把椅子下方放置独立正方形镜面。
+      const mirrorMetric = arrayModelMetrics[layout.modelIndex];
+      const mirrorGeometry = new THREE.PlaneGeometry(
+        mirrorMetric.mirrorSize,
+        mirrorMetric.mirrorSize
+      );
+      const mirror = new Reflector(mirrorGeometry, {
+        clipBias: 0.001,
+        textureWidth: getMirrorTextureSize(),
+        textureHeight: getMirrorTextureSize(),
+        color: 0xf7fbff,
+        multisample: renderer.capabilities.isWebGL2 ? 4 : 0
+      });
+      mirror.rotation.x = -Math.PI / 2;
+      mirror.position.set(0, mirrorMetric.floorY - size.y * 0.006, 0);
+      mirror.renderOrder = 1;
+      const mirrorRenderTarget = mirror.getRenderTarget();
+      mirrorRenderTarget.texture.minFilter = THREE.LinearFilter;
+      mirrorRenderTarget.texture.magFilter = THREE.LinearFilter;
+      mirrorRenderTarget.texture.generateMipmaps = false;
+      if (renderer.capabilities.isWebGL2) {
+        mirrorRenderTarget.samples = 4;
+      }
+      mirror.userData.chairState = chairState;
+      instanceGroup.add(mirror);
+      chairMirrors.push(mirror);
+
+      // 反射时临时切换为蓝天背景，并隐藏其他镜子，避免镜面之间递归反射。
+      const originalMirrorRender = mirror.onBeforeRender.bind(mirror);
+      mirror.onBeforeRender = function (...args) {
+        const previousBackground = scene.background;
+        const previousVisibility = chairMirrors.map((item) => item.visible);
+
+        scene.background = skyReflectionTexture;
+        for (let i = 0; i < chairMirrors.length; i++) {
+          chairMirrors[i].visible = chairMirrors[i] === mirror;
+        }
+
+        originalMirrorRender(...args);
+
+        scene.background = previousBackground;
+        for (let i = 0; i < chairMirrors.length; i++) {
+          chairMirrors[i].visible = previousVisibility[i];
+        }
+      };
+
+      const serialLabel = createSerialNumberLabel(chairInstances.length + 1);
+      chairState.serialLabel = serialLabel;
+
+      chairInstances.push(chairState);
+    });
+
+    // 暂时把这一排椅子放到目标位置，以计算完整阵列尺寸
+    chairInstances.forEach((chair) => {
+      chair.root.position.copy(chair.targetPosition);
+      chair.root.scale.setScalar(1);
+    });
+    chairRoot.updateMatrixWorld(true);
+
+    const arrayBox = new THREE.Box3().setFromObject(chairRoot);
+    const arraySize = new THREE.Vector3();
+    const arrayCenter = new THREE.Vector3();
+    arrayBox.getSize(arraySize);
+    arrayBox.getCenter(arrayCenter);
+
+    // 恢复第一屏：保留完整阵列，只切换到极近距离镜头
+    chairInstances.forEach((chair) => {
+      chair.root.position.copy(chair.startPosition);
+      chair.root.scale.setScalar(chair.startScale);
+    });
+    chairRoot.updateMatrixWorld(true);
+
+    const fovRad = THREE.MathUtils.degToRad(camera.fov);
+    const heroVerticalDist = (size.y / CONFIG.modelScreenHeight) / (2 * Math.tan(fovRad / 2));
+    const horizontalFov = 2 * Math.atan(Math.tan(fovRad / 2) * camera.aspect);
+    const heroHorizontalDist = (size.x / 0.72) / (2 * Math.tan(horizontalFov / 2));
+    const heroDist = Math.max(heroVerticalDist, heroHorizontalDist) * 1.02;
+    const arrayRadius = arraySize.length() * 0.5;
+
+    // 第一、二屏：稳定的正面单椅视角
+    closeCameraPosition.set(0, size.y * 0.08, heroDist * 1.02);
+    closeCameraTarget.set(0, 0, 0);
+
+    // 保留原本的右上方斜视角，只调整距离来保证整排椅子完整进入画面
+    const rowFitDistance = Math.max(
+      arraySize.x / (2 * Math.tan(horizontalFov * 0.5)) * 1.28,
+      arraySize.y / (2 * Math.tan(fovRad * 0.5)) * 1.42
+    );
+
+    const frontDirection = new THREE.Vector3(1.08, 0.48, 1.18).normalize();
+    frontCameraPosition.copy(arrayCenter).addScaledVector(
+      frontDirection,
+      rowFitDistance
+    );
+    frontCameraTarget.copy(arrayCenter);
+    frontCameraTarget.y += size.y * 0.02;
+
+    const middleDirection = new THREE.Vector3(1.10, 0.92, 1.16).normalize();
+    middleCameraPosition.copy(arrayCenter).addScaledVector(
+      middleDirection,
+      rowFitDistance * 1.02
+    );
+    middleCameraTarget.copy(arrayCenter);
+    middleCameraTarget.y += size.y * 0.03;
+
+    const arrayDirection = new THREE.Vector3(1.15, 1.55, 1.15).normalize();
+    arrayCameraPosition.copy(arrayCenter).addScaledVector(
+      arrayDirection,
+      rowFitDistance * 1.08
+    );
+    arrayCameraTarget.copy(arrayCenter);
+    arrayCameraTarget.y += size.y * 0.04;
+
+    // 最后一屏保持高位阵列构图，只做非常轻微的推进与抬升，避免突然甩回单椅视角
+    finalChairCameraPosition.lerpVectors(
+      arrayCameraPosition,
+      arrayCameraTarget,
+      0.08
+    );
+    finalChairCameraPosition.y += size.y * 0.035;
+    finalChairCameraTarget.copy(arrayCameraTarget);
+    finalChairCameraTarget.y += size.y * 0.018;
+
+    // 第五屏：横向椅子浏览，当前椅子精确停在画面正中。
+    carouselCameraTarget.set(0, size.y * 0.03, 0);
+    carouselCameraPosition.set(0, size.y * 0.10, heroDist * 1.22);
+
+    // 阴影相机覆盖完整椅子阵列，保证边缘椅子的长投影也不会被裁切
+    const shadowExtent = Math.max(arraySize.x, arraySize.z) * 0.82;
+    topLight.target.position.copy(arrayCenter);
+    topLight.shadow.camera.left = -shadowExtent;
+    topLight.shadow.camera.right = shadowExtent;
+    topLight.shadow.camera.top = shadowExtent;
+    topLight.shadow.camera.bottom = -shadowExtent;
+    topLight.shadow.camera.updateProjectionMatrix();
+
+    carouselChairIndex = heroColumn;
+    const initialCarouselChair = chairInstances.find(
+      (chair) => chair.row === heroRow && chair.column === carouselChairIndex
+    );
+    carouselOffsetX = initialCarouselChair ? -initialCarouselChair.targetPosition.x : 0;
+    carouselTargetOffsetX = carouselOffsetX;
+    updateCarouselButtons();
+
+    camera.position.copy(closeCameraPosition);
+    camera.lookAt(closeCameraTarget);
+    camera.updateProjectionMatrix();
+
+    const shadowGeometry = new THREE.PlaneGeometry(arraySize.x * 1.45, arraySize.z * 1.45);
+    const shadowMaterial = new THREE.ShadowMaterial({
+      color: 0x8a8a8a,
+      opacity: 0.20,
+      transparent: true,
+      depthWrite: false
+    });
+    const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowCatcher.rotation.x = -Math.PI / 2;
+    shadowCatcher.position.set(arrayCenter.x, -size.y * 0.53, arrayCenter.z);
+    shadowCatcher.receiveShadow = true;
+    scene.add(shadowCatcher);
+
+    console.log(`金色椅子加载成功，独立三角面总数: ${triMeshes.length}`);
+  })
+  .catch((err) => {
+    console.error('椅子模型加载或页面初始化失败:', err);
+    const message = document.createElement('div');
+    message.textContent = '椅子模型加载失败，请检查文件名和浏览器控制台';
+    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:10;';
+    document.body.appendChild(message);
+  });
+
+// ─── 拆分三角面 ──────────────────────────────────────────────────────────────
+function splitToTriangles(root, targetGroup, baseMaterial, instanceRoot) {
+  // 收集根节点下所有 Mesh
+  const meshes = [];
+  root.traverse((obj) => { if (obj.isMesh) meshes.push(obj); });
+
+  // 所有三角面统一使用银灰色金属材质
+
+  meshes.forEach((sourceMesh) => {
+    sourceMesh.updateWorldMatrix(true, false);
+    targetGroup.updateWorldMatrix(true, false);
+
+    // 只烘焙相对于当前椅子容器的局部变换，避免阵列位置被重复计算
+    const localMatrix = targetGroup.matrixWorld.clone().invert().multiply(sourceMesh.matrixWorld);
+
+    // toNonIndexed：每三个顶点构成独立三角面，顶点不再共享
+    const geo = sourceMesh.geometry.toNonIndexed();
+    geo.applyMatrix4(localMatrix);
+
+    const posAttr    = geo.attributes.position;
+    const uvAttr     = geo.attributes.uv;
+    const normAttr   = geo.attributes.normal;
+    const triCount   = posAttr.count / 3;
+
+    // 材质数组（单材质包装成数组统一处理）
+    const mats = Array.isArray(sourceMesh.material)
+      ? sourceMesh.material : [sourceMesh.material];
+
+    // 建立三角面 → 材质索引的映射
+    const triMatIndex = new Uint16Array(triCount);
+    const groups = geo.groups.length > 0
+      ? geo.groups
+      : [{ start: 0, count: posAttr.count, materialIndex: 0 }];
+    groups.forEach(({ start, count, materialIndex }) => {
+      const s = start / 3, e = (start + count) / 3;
+      for (let t = s; t < e; t++) triMatIndex[t] = materialIndex;
+    });
+
+    for (let i = 0; i < triCount; i++) {
+      const base = i * 3;
+
+      // 位置：3 个顶点 × 3 分量
+      const triPos = new Float32Array(9);
+      for (let v = 0; v < 3; v++) {
+        triPos[v*3  ] = posAttr.getX(base + v);
+        triPos[v*3+1] = posAttr.getY(base + v);
+        triPos[v*3+2] = posAttr.getZ(base + v);
+      }
+      const triGeo = new THREE.BufferGeometry();
+      triGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3));
+
+      // UV（保留，贴图正常显示所必须）
+      if (uvAttr) {
+        const triUV = new Float32Array(6);
+        for (let v = 0; v < 3; v++) {
+          triUV[v*2  ] = uvAttr.getX(base + v);
+          triUV[v*2+1] = uvAttr.getY(base + v);
+        }
+        triGeo.setAttribute('uv', new THREE.BufferAttribute(triUV, 2));
+      }
+
+      // 法线（保留，材质光照所必须）
+      if (normAttr) {
+        const triNorm = new Float32Array(9);
+        for (let v = 0; v < 3; v++) {
+          triNorm[v*3  ] = normAttr.getX(base + v);
+          triNorm[v*3+1] = normAttr.getY(base + v);
+          triNorm[v*3+2] = normAttr.getZ(base + v);
+        }
+        triGeo.setAttribute('normal', new THREE.BufferAttribute(triNorm, 3));
+      } else {
+        triGeo.computeVertexNormals();
+      }
+
+      // 先计算三角面中心，再把几何中心移到自身原点，确保旋转围绕面片自身中心发生
+      triGeo.computeBoundingBox();
+      const origCenter = new THREE.Vector3();
+      triGeo.boundingBox.getCenter(origCenter);
+      triGeo.translate(-origCenter.x, -origCenter.y, -origCenter.z);
+
+      const mesh = new THREE.Mesh(triGeo, baseMaterial);
+      mesh.position.copy(origCenter);
+      mesh.userData.instanceRoot = instanceRoot;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      // 平均面法线（用于排斥方向微调）
+      const fn = new THREE.Vector3();
+      if (normAttr) {
+        fn.set(
+          normAttr.getX(base) + normAttr.getX(base+1) + normAttr.getX(base+2),
+          normAttr.getY(base) + normAttr.getY(base+1) + normAttr.getY(base+2),
+          normAttr.getZ(base) + normAttr.getZ(base+1) + normAttr.getZ(base+2)
+        ).normalize();
+      }
+
+      targetGroup.add(mesh);
+      triMeshes.push({
+        mesh,
+        origCenter,           // 世界空间原始中心（t=0）
+        faceNormal: fn,
+        instanceRoot,
+        baseMaterial,
+        currentOffset: new THREE.Vector3(),
+        targetOffset:  new THREE.Vector3(),
+        rotationAxis: new THREE.Vector3(
+          Math.random() - 0.5,
+          Math.random() - 0.5,
+          Math.random() - 0.5
+        ).normalize(),
+        rotationDirection: Math.random() < 0.5 ? -1 : 1,
+        rotationAmount: THREE.MathUtils.lerp(0.55, 1.0, Math.random()),
+        currentRotation: new THREE.Vector3(),
+        targetRotation: new THREE.Vector3(),
+        currentInfluence: 0,  // 0 = 银灰金属，1 = 纯白受力状态
+        dynamicMaterial: null // 进入受力区域后按需创建，用于连续材质渐变
+      });
+    }
+  });
+}
+
+// ─── 鼠标事件 ────────────────────────────────────────────────────────────────
+renderer.domElement.addEventListener('pointermove', (e) => {
+  mouseOnCanvas = true;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse2D.set(
+     ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+    -((e.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+});
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (event.button === 2) isOrbiting = true;
+});
+
+window.addEventListener('pointerup', () => {
+  isOrbiting = false;
+});
+
+renderer.domElement.addEventListener('pointerleave', () => {
+  mouseOnCanvas = false;
+});
+
+// 左键点击椅子：第二屏选择主椅；第五屏进入对应收藏证书页面。
+renderer.domElement.addEventListener('click', (event) => {
+  if (
+    event.button !== 0 ||
+    isOrbiting ||
+    certificateMode ||
+    chairInstances.length === 0 ||
+    (activeScreenIndex !== 1 && activeScreenIndex !== 4)
+  ) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  _pickPointer.set(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+
+  raycaster.setFromCamera(_pickPointer, camera);
+  const hits = raycaster.intersectObjects(
+    triMeshes.map((tri) => tri.mesh),
+    false
+  );
+
+  if (hits.length === 0) return;
+
+  const instanceRoot = hits[0].object.userData.instanceRoot;
+  const selectedChair = instanceRoot?.userData?.chairState;
+  if (!selectedChair || selectedChair.row !== 1) return;
+
+  if (activeScreenIndex === 4) {
+    openCertificate(selectedChair);
+    return;
+  }
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    chairInstances[i].isHero = chairInstances[i] === selectedChair;
+  }
+
+  goToScreen(0);
+});
+
+// ─── 滚动驱动四个定格 ──────────────────────────────────────────────────────
+function updateScrollProgress() {
+  const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  scrollProgress = THREE.MathUtils.clamp(window.scrollY / maxScroll, 0, 1);
+
+  const nearestIndex = Math.round(window.scrollY / window.innerHeight);
+  activeScreenIndex = THREE.MathUtils.clamp(nearestIndex, 0, scrollPanels.length - 1);
+  updateScreenProgress(activeScreenIndex);
+}
+
+window.addEventListener('scroll', updateScrollProgress, { passive: true });
+updateScrollProgress();
+
+window.addEventListener('wheel', (event) => {
+  if (certificateMode) {
+    event.preventDefault();
+    return;
+  }
+  if (Math.abs(event.deltaY) < 8) return;
+  event.preventDefault();
+  if (isSnapping) return;
+
+  const direction = event.deltaY > 0 ? 1 : -1;
+  goToScreen(activeScreenIndex + direction);
+}, { passive: false });
+
+// ─── 窗口缩放 ────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  for (let i = 0; i < chairMirrors.length; i++) {
+    const renderTarget = chairMirrors[i].getRenderTarget?.();
+    if (renderTarget) {
+      const mirrorTextureSize = getMirrorTextureSize();
+      renderTarget.setSize(mirrorTextureSize, mirrorTextureSize);
+    }
+  }
+  if (certificateMode) resizeCollectorSignatureCanvas();
+});
+
+// ─── 主动画循环 ──────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const elapsed = clock.getElapsedTime();
+
+  if (certificateMode && certificateChair) {
+    for (let i = 0; i < chairInstances.length; i++) {
+      const chair = chairInstances[i];
+      const isSelected = chair === certificateChair;
+      chair.root.visible = isSelected;
+      chair.root.scale.setScalar(isSelected ? 1 : 0.001);
+    }
+
+    for (let i = 0; i < chairMirrors.length; i++) {
+      chairMirrors[i].visible = false;
+    }
+
+    const selectedSize = certificateChair.modelSize || chairModelSize;
+    const selectedCenter = certificateChair.modelCenter || _origin;
+
+    const isNarrowCertificate = window.innerWidth <= 900;
+    const certificateChairScale = isNarrowCertificate ? 0.62 : 0.74;
+
+    certificateChair.root.position.set(
+      selectedSize.x * 0.34,
+      -selectedCenter.y - selectedSize.y * 0.015,
+      0
+    );
+    certificateChair.root.scale.setScalar(certificateChairScale);
+
+    certificateRotation += 0.0028;
+    certificateChair.root.rotation.set(0, certificateRotation + 0.34, 0);
+
+    const certificateFov = THREE.MathUtils.degToRad(camera.fov);
+    const certificateHorizontalFov = 2 * Math.atan(
+      Math.tan(certificateFov / 2) * camera.aspect
+    );
+    const fitByHeight =
+      (selectedSize.y * certificateChairScale) /
+      (2 * Math.tan(certificateFov / 2) * 0.86);
+    const fitByWidth =
+      (selectedSize.x * certificateChairScale) /
+      (2 * Math.tan(certificateHorizontalFov / 2) * 0.48);
+    const certificateDistance = Math.max(fitByHeight, fitByWidth);
+
+    const certificateFramingOffsetX = selectedSize.x * 0.34;
+    const certificateTarget = new THREE.Vector3(
+      certificateChair.root.position.x - certificateFramingOffsetX,
+      selectedSize.y * 0.015,
+      0
+    );
+    camera.position.set(
+      certificateTarget.x + certificateDistance * 0.38,
+      selectedSize.y * 0.055,
+      certificateDistance
+    );
+    camera.lookAt(certificateTarget);
+    controls.target.copy(certificateTarget);
+    controls.update();
+
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.clear();
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // ① 五屏顺序：单椅 → 阵列过渡 → 高位阵列 → 阵列 + intro → 横向椅子浏览
+  const firstStageProgress = THREE.MathUtils.clamp(scrollProgress * 4, 0, 1);
+  const transition = firstStageProgress * firstStageProgress *
+    (3 - 2 * firstStageProgress);
+
+  // 第四屏显示 intro；进入第五屏时让文字退出。
+  const introEnter = THREE.MathUtils.smoothstep(scrollProgress, 0.58, 0.74);
+  const introExit = 1.0 - THREE.MathUtils.smoothstep(scrollProgress, 0.79, 0.94);
+  const introTarget = introEnter * introExit;
+  finalIntroRevealAmount = THREE.MathUtils.lerp(
+    finalIntroRevealAmount,
+    introTarget,
+    0.14
+  );
+  finalIntro.style.opacity = String(finalIntroRevealAmount);
+  finalIntro.classList.toggle('is-visible', finalIntroRevealAmount > 0.02);
+
+  // 第一屏只保留主椅；滑向第二屏时其余椅子完整展开
+  const arrayReveal = THREE.MathUtils.smoothstep(firstStageProgress, 0.18, 0.88);
+
+  // 第三、四屏共用同一套 3×7 阵列；回到第二屏时立即恢复原始排布，避免残留错位。
+  const thirdScreenSpreadTarget =
+    activeScreenIndex === 2 || activeScreenIndex === 3 ? 1 : 0;
+
+  if (activeScreenIndex <= 1) {
+    thirdScreenSpreadAmount = 0;
+  } else {
+    thirdScreenSpreadAmount = THREE.MathUtils.lerp(
+      thirdScreenSpreadAmount,
+      thirdScreenSpreadTarget,
+      0.14
+    );
+  }
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    const chair = chairInstances[i];
+    const isMiddleRow = chair.row === 1;
+    const firstScreenPosition = chair.isHero ? _origin : chair.targetPosition;
+
+    chair.root.position.lerpVectors(
+      firstScreenPosition,
+      chair.targetPosition,
+      transition
+    );
+
+    if (thirdScreenSpreadAmount > 0.001) {
+      chair.root.position.x *= THREE.MathUtils.lerp(1, 1.18, thirdScreenSpreadAmount);
+      chair.root.position.z *= THREE.MathUtils.lerp(1, 1.28, thirdScreenSpreadAmount);
+    }
+
+    let shouldRender = true;
+    let scale = 1;
+
+    if (activeScreenIndex === 0) {
+      shouldRender = chair.isHero;
+      scale = chair.isHero ? 1 : 0.001;
+    } else if (activeScreenIndex === 1) {
+      shouldRender = isMiddleRow;
+      scale = isMiddleRow ? 1 : 0.001;
+    } else if (activeScreenIndex === 4) {
+      shouldRender = isMiddleRow;
+      scale = isMiddleRow ? 1 : 0.001;
+    }
+
+    chair.root.visible = shouldRender;
+    chair.root.scale.setScalar(scale);
+  }
+
+  const carouselVisibility = THREE.MathUtils.smoothstep(
+    scrollProgress,
+    0.79,
+    0.98
+  );
+
+  carouselOffsetX = THREE.MathUtils.lerp(
+    carouselOffsetX,
+    carouselTargetOffsetX,
+    0.14
+  );
+
+  if (carouselVisibility > 0.001) {
+    for (let i = 0; i < chairInstances.length; i++) {
+      const chair = chairInstances[i];
+      const isMiddleRow = chair.row === 1;
+      const carouselPosition = chair.targetPosition.clone();
+      carouselPosition.x += carouselOffsetX;
+      carouselPosition.z = 0;
+
+      chair.root.position.lerp(carouselPosition, carouselVisibility);
+      chair.root.scale.setScalar(
+        THREE.MathUtils.lerp(
+          chair.root.scale.x,
+          isMiddleRow ? 1 : 0.001,
+          carouselVisibility
+        )
+      );
+    }
+  }
+
+  // 只渲染当前屏真正可见椅子的镜面，避免第二屏仍计算 21 个 Reflector。
+  const mirrorsEnabledForScreen = activeScreenIndex !== 2 && activeScreenIndex !== 3;
+  for (let i = 0; i < chairMirrors.length; i++) {
+    const mirror = chairMirrors[i];
+    const chair = mirror.userData.chairState;
+    const chairVisible = chair ? chair.root.visible : true;
+    mirror.visible = mirrorsEnabledForScreen && chairVisible;
+  }
+
+  // ② 五个停留镜头：原四屏镜头 + 第五屏横向椅子浏览
+  if (Math.abs(scrollProgress - lastAppliedScrollProgress) > 0.0001) {
+    const segmentCount = 4;
+    const scaledProgress = THREE.MathUtils.clamp(scrollProgress, 0, 1) * segmentCount;
+    const segmentIndex = Math.min(segmentCount - 1, Math.floor(scaledProgress));
+    const rawSegmentProgress = scaledProgress - segmentIndex;
+    const segmentEase = rawSegmentProgress * rawSegmentProgress * (3 - 2 * rawSegmentProgress);
+
+    if (segmentIndex === 0) {
+      currentCameraPosition.lerpVectors(
+        closeCameraPosition,
+        frontCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        closeCameraTarget,
+        frontCameraTarget,
+        segmentEase
+      );
+    } else if (segmentIndex === 1) {
+      currentCameraPosition.lerpVectors(
+        frontCameraPosition,
+        middleCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        frontCameraTarget,
+        middleCameraTarget,
+        segmentEase
+      );
+    } else if (segmentIndex === 2) {
+      currentCameraPosition.lerpVectors(
+        middleCameraPosition,
+        arrayCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        middleCameraTarget,
+        arrayCameraTarget,
+        segmentEase
+      );
+    } else {
+      currentCameraPosition.lerpVectors(
+        finalChairCameraPosition,
+        carouselCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        finalChairCameraTarget,
+        carouselCameraTarget,
+        segmentEase
+      );
+    }
+
+    camera.position.copy(currentCameraPosition);
+    controls.target.copy(currentCameraTarget);
+    camera.lookAt(currentCameraTarget);
+    controls.update();
+    lastAppliedScrollProgress = scrollProgress;
+  }
+
+  // ③ 更新鼠标三维位置。
+  // 交互平面始终穿过椅子中心并正对当前相机，因此旋转视角后斥力仍然准确。
+  if (mouseOnCanvas && !isOrbiting && triMeshes.length > 0) {
+    camera.getWorldDirection(_cameraDir);
+    hitPlane.setFromNormalAndCoplanarPoint(_cameraDir, chairRoot.position);
+    raycaster.setFromCamera(mouse2D, camera);
+    const hit = raycaster.ray.intersectPlane(hitPlane, _hitResult);
+    if (hit !== null) mouse3DTarget.copy(hit);
+    mouse3D.lerp(mouse3DTarget, CONFIG.pointerEase);
+  }
+
+  // ④ 第一屏保留局部斥力；第二屏关闭斥力。
+  const repulsionEnabled = activeScreenIndex === 0;
+  const arrayInfluence = 0;
+  const activeRepelRadius = THREE.MathUtils.lerp(
+    CONFIG.repelRadius,
+    CONFIG.arrayRepelRadius,
+    arrayInfluence
+  );
+  const activeRepelStrength = THREE.MathUtils.lerp(
+    CONFIG.repelStrength,
+    CONFIG.arrayRepelStrength,
+    arrayInfluence
+  );
+  const activeRotationStrength = THREE.MathUtils.lerp(
+    CONFIG.rotationStrength,
+    CONFIG.arrayRotationStrength,
+    arrayInfluence
+  );
+
+  const repelR = modelSize * activeRepelRadius;
+  const repelS = modelSize * activeRepelStrength;
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    chairInstances[i].serialInfluence = 0;
+  }
+
+  // ⑤ 逐三角面计算排斥 + 恢复
+  for (let i = 0; i < triMeshes.length; i++) {
+    const tri = triMeshes[i];
+    const baseMaterial = tri.baseMaterial;
+    let influence = 0;
+    const chairState = tri.instanceRoot.userData.chairState;
+
+    if (mouseOnCanvas && !isOrbiting && repulsionEnabled) {
+      // 三角面当前世界位置 = 原始中心 + 当前额外偏移
+      _worldPos.copy(tri.origCenter).add(tri.currentOffset);
+      tri.instanceRoot.localToWorld(_worldPos);
+
+      _diff.subVectors(_worldPos, mouse3D);
+      const dist = _diff.length();
+
+      if (dist < repelR && dist > 1e-5) {
+        // smoothstep 衰减：边界 0、中心 1
+        const t       = dist / repelR;
+        const falloff = 1.0 - t * t * (3.0 - 2.0 * t);
+        influence = falloff;
+
+        // 排斥方向：从鼠标指向三角面中心，混合少量面法线
+        _repelDir.copy(_diff).normalize();
+        _repelDir.addScaledVector(tri.faceNormal, 0.08).normalize();
+
+        tri.targetOffset.copy(_repelDir).multiplyScalar(repelS * falloff);
+        tri.targetRotation.copy(tri.rotationAxis).multiplyScalar(
+          activeRotationStrength * tri.rotationAmount * tri.rotationDirection * falloff
+        );
+      } else {
+        tri.targetOffset.set(0, 0, 0);
+        tri.targetRotation.set(0, 0, 0);
+      }
+    } else {
+      // 鼠标不在画布内，位移与旋转都平滑归零
+      tri.targetOffset.set(0, 0, 0);
+      tri.targetRotation.set(0, 0, 0);
+    }
+
+    // 弹簧缓动恢复
+    tri.currentOffset.lerp(tri.targetOffset, CONFIG.returnEase);
+    tri.currentRotation.lerp(tri.targetRotation, CONFIG.rotationEase);
+
+    // 受力程度连续过渡，不再在银灰和纯白之间生硬切换
+    tri.currentInfluence = THREE.MathUtils.lerp(
+      tri.currentInfluence,
+      influence,
+      0.12
+    );
+
+    if (chairState) {
+      chairState.serialInfluence = Math.max(
+        chairState.serialInfluence,
+        tri.currentInfluence
+      );
+    }
+
+    const blend = THREE.MathUtils.smoothstep(tri.currentInfluence, 0, 1);
+
+    if (blend > 0.002) {
+      // 仅在碎片真正进入受力区时创建独立材质，避免所有碎片预先复制材质
+      if (!tri.dynamicMaterial) {
+        tri.dynamicMaterial = baseMaterial.clone();
+        tri.mesh.material = tri.dynamicMaterial;
+      }
+
+      const material = tri.dynamicMaterial;
+      material.color.copy(baseMaterial.color).lerp(whiteFragmentMaterial.color, blend);
+      material.metalness = THREE.MathUtils.lerp(
+        baseMaterial.metalness,
+        whiteFragmentMaterial.metalness,
+        blend
+      );
+      material.roughness = THREE.MathUtils.lerp(
+        baseMaterial.roughness,
+        whiteFragmentMaterial.roughness,
+        blend
+      );
+      material.clearcoat = THREE.MathUtils.lerp(
+        baseMaterial.clearcoat,
+        whiteFragmentMaterial.clearcoat,
+        blend
+      );
+      material.clearcoatRoughness = THREE.MathUtils.lerp(
+        baseMaterial.clearcoatRoughness,
+        whiteFragmentMaterial.clearcoatRoughness,
+        blend
+      );
+      material.envMapIntensity = THREE.MathUtils.lerp(
+        baseMaterial.envMapIntensity,
+        whiteFragmentMaterial.envMapIntensity,
+        blend
+      );
+      material.bumpScale = THREE.MathUtils.lerp(
+        baseMaterial.bumpScale,
+        0,
+        blend
+      );
+      material.needsUpdate = true;
+    } else if (tri.dynamicMaterial) {
+      // 完全复位后重新共享金属材质，并释放独立材质
+      tri.mesh.material = baseMaterial;
+      tri.dynamicMaterial.dispose();
+      tri.dynamicMaterial = null;
+    }
+
+    // 位移叠加在原始中心上；旋转围绕面片自身中心轻微发生
+    tri.mesh.position.copy(tri.origCenter).add(tri.currentOffset);
+    tri.mesh.rotation.set(
+      tri.currentRotation.x,
+      tri.currentRotation.y,
+      tri.currentRotation.z
+    );
+  }
+
+  // 第一屏：主椅被拆散后显示艺术家签名
+  const heroChair = chairInstances.find((chair) => chair.isHero);
+  const firstScreenVisibility = 1.0 - THREE.MathUtils.smoothstep(
+    scrollProgress,
+    0.06,
+    0.24
+  );
+  const signatureTarget = heroChair
+    ? THREE.MathUtils.smoothstep(heroChair.serialInfluence, 0.06, 0.30) * firstScreenVisibility
+    : 0;
+
+  signatureRevealAmount = THREE.MathUtils.lerp(
+    signatureRevealAmount,
+    signatureTarget,
+    0.18
+  );
+  if (heroChair) {
+    _serialWorldPos.copy(heroChair.infoAnchor);
+    heroChair.root.localToWorld(_serialWorldPos);
+    _serialScreenPos.copy(_serialWorldPos).project(camera);
+
+    const infoScreenX = (_serialScreenPos.x * 0.5 + 0.5) * window.innerWidth;
+    const infoScreenY = (-_serialScreenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+    signaturePanel.style.left = `${infoScreenX}px`;
+    signaturePanel.style.top = `${infoScreenY}px`;
+  }
+  const signatureScale = THREE.MathUtils.lerp(0.86, 1.0, THREE.MathUtils.smoothstep(signatureRevealAmount, 0, 1));
+
+  signaturePanel.style.setProperty('--signature-scale', signatureScale.toFixed(4));
+  signaturePanel.style.opacity = String(signatureRevealAmount);
+
+  // 阵列完整出现后：每把椅子被拆散时显示对应二维编号
+  const arrayNumberVisibility = THREE.MathUtils.smoothstep(
+    scrollProgress,
+    0.24,
+    0.36
+  );
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    const chair = chairInstances[i];
+    if (!chair.serialLabel) continue;
+
+    const targetOpacity = THREE.MathUtils.smoothstep(
+      chair.serialInfluence,
+      0.06,
+      0.30
+    ) * arrayNumberVisibility;
+
+    chair.serialOpacity = THREE.MathUtils.lerp(
+      chair.serialOpacity,
+      targetOpacity,
+      0.18
+    );
+
+    // Compute screen position for label
+    _serialWorldPos.copy(chair.serialAnchor);
+    chair.root.localToWorld(_serialWorldPos);
+    _serialScreenPos.copy(_serialWorldPos).project(camera);
+
+    const visible = _serialScreenPos.z > -1 && _serialScreenPos.z < 1;
+    const screenX = (_serialScreenPos.x * 0.5 + 0.5) * window.innerWidth;
+    const screenY = (-_serialScreenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+    chair.serialLabel.style.left = `${screenX}px`;
+    chair.serialLabel.style.top = `${screenY}px`
+    chair.serialLabel.style.opacity = visible ? String(chair.serialOpacity) : '0';
+  }
+
+  const onCarouselScreen = activeScreenIndex === scrollPanels.length - 1;
+  chairCarouselControls.classList.toggle('is-visible', onCarouselScreen);
+  carouselTitle.classList.toggle('is-visible', onCarouselScreen);
+  pageUi.classList.toggle('is-carousel-screen', onCarouselScreen);
+
+  controls.update();
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>

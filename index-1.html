@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chair</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    canvas { display: block; }
+
+    .repel-control {
+      position: fixed;
+      left: 28px;
+      bottom: 28px;
+      z-index: 10;
+      width: 260px;
+      padding: 14px 16px 16px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      font-family: Arial, sans-serif;
+      color: #111;
+    }
+
+    .repel-control__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .repel-control input[type="range"] {
+      width: 100%;
+      cursor: pointer;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="repel-control">
+    <div class="repel-control__header">
+      <span>Repulsion</span>
+      <span id="repelValue">22%</span>
+    </div>
+    <input id="repelSlider" type="range" min="0" max="100" value="22" step="1" />
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ─── 可调参数 ────────────────────────────────────────────────────────────────
+const CONFIG = {
+  modelPath:         './chair.glb',
+  modelScreenHeight:  0.65,   // 椅子高度占画面高度比例
+  floatAmplitude:     0.04,   // 悬浮幅度（模型高度的比例）
+  floatSpeed:         0.7,    // 悬浮速度（rad/s）
+  repelRadius:        0.36,   // 扩大斥力影响范围，让更大区域的面参与避让
+  repelStrength:      0.11,   // 增大最大位移，让三角面之间更明显地散开
+  returnEase:         0.12,   // 鼠标离开后柔和复位
+  pointerEase:        0.22    // 鼠标 3D 位置平滑插值系数
+};
+
+// ─── 斥力滑杆 ────────────────────────────────────────────────────────────────
+const repelSlider = document.getElementById('repelSlider');
+const repelValue  = document.getElementById('repelValue');
+
+function updateRepulsion(value) {
+  const t = Number(value) / 100;
+
+  // 滑杆越大，影响范围与位移强度同步增大。
+  // 拉到最右侧时，斥力范围覆盖整把椅子，并允许三角面大幅散开。
+  CONFIG.repelRadius   = THREE.MathUtils.lerp(0.12, 1.6, t);
+  CONFIG.repelStrength = THREE.MathUtils.lerp(0.015, 1.25, t * t);
+
+  repelValue.textContent = `${Math.round(t * 100)}%`;
+}
+
+repelSlider.addEventListener('input', (event) => {
+  updateRepulsion(event.target.value);
+});
+
+updateRepulsion(repelSlider.value);
+
+// ─── 渲染器 ──────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ─── 场景 / 相机 ─────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+// 中性摄影棚环境反射，让银灰金属呈现真实高光与明暗层次
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+const roomEnvironment = new RoomEnvironment();
+scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
+roomEnvironment.dispose();
+pmremGenerator.dispose();
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+
+// ─── 模型预览控制：按住鼠标右键拖动旋转 ──────────────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.enableZoom = true;
+controls.target.set(0, 0, 0);
+
+// 左键保留给后续模型交互；右键用于旋转；滚轮用于缩放
+controls.mouseButtons.LEFT = null;
+controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+
+// 阻止右键拖动时弹出浏览器菜单
+renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+
+// ─── 灯光 ────────────────────────────────────────────────────────────────────
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbcbcbc, 0.82);
+scene.add(hemiLight);
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+keyLight.position.set(3.5, 5.5, 4.5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 0.1;
+keyLight.shadow.camera.far = 50;
+keyLight.shadow.bias = -0.0005;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xe8edf0, 1.05);
+fillLight.position.set(-4, 2.5, 2.5);
+scene.add(fillLight);
+
+const backLight = new THREE.DirectionalLight(0xffffff, 1.15);
+backLight.position.set(0, 4, -5);
+scene.add(backLight);
+
+// ─── 层级：chairRoot 做悬浮 Y 偏移，chairGroup 存放三角面 ────────────────────
+const chairRoot  = new THREE.Group();
+const chairGroup = new THREE.Group();
+chairRoot.add(chairGroup);
+scene.add(chairRoot);
+
+// ─── 鼠标交互用的不可见平面（法线朝相机，即 +Z 方向；平面 z=0 恒不变）──────
+// camera 在 z 轴正方向，模型中心在原点，z=0 平面是最合理的交互面
+const hitPlane   = new THREE.Plane();
+const _cameraDir = new THREE.Vector3();
+const raycaster  = new THREE.Raycaster();
+const _hitResult = new THREE.Vector3(); // intersectPlane 复用目标
+
+// ─── 运行时状态 ──────────────────────────────────────────────────────────────
+let triMeshes          = [];   // { mesh, origCenter, faceNormal, currentOffset, targetOffset }
+let modelSize          = 1;    // 包围盒最大维度（世界单位）
+let floatAmplitudeWorld= 0.1;  // 悬浮幅度（世界单位）
+
+const mouse2D      = new THREE.Vector2(-9999, -9999); // NDC
+const mouse3D      = new THREE.Vector3();              // 平滑后的 3D 鼠标位置
+const mouse3DTarget= new THREE.Vector3();              // 射线命中目标
+let   mouseOnCanvas= false;
+let   isOrbiting   = false;
+
+// 每帧复用的临时向量，避免 GC
+const _worldPos = new THREE.Vector3();
+const _diff     = new THREE.Vector3();
+const _repelDir = new THREE.Vector3();
+
+// 生成细密、低对比度的金属颗粒纹理，用于微表面粗糙度和极轻微凹凸
+const metalGrainCanvas = document.createElement('canvas');
+metalGrainCanvas.width = 512;
+metalGrainCanvas.height = 512;
+const grainCtx = metalGrainCanvas.getContext('2d');
+const grainImage = grainCtx.createImageData(512, 512);
+
+for (let i = 0; i < grainImage.data.length; i += 4) {
+  const fineNoise = 72 + Math.random() * 118;
+  const occasionalSpark = Math.random() > 0.982 ? 52 : 0;
+  const value = Math.min(235, fineNoise + occasionalSpark);
+  grainImage.data[i] = value;
+  grainImage.data[i + 1] = value;
+  grainImage.data[i + 2] = value;
+  grainImage.data[i + 3] = 255;
+}
+
+grainCtx.putImageData(grainImage, 0, 0);
+
+const metalGrainTexture = new THREE.CanvasTexture(metalGrainCanvas);
+metalGrainTexture.wrapS = THREE.RepeatWrapping;
+metalGrainTexture.wrapT = THREE.RepeatWrapping;
+metalGrainTexture.repeat.set(14, 14);
+metalGrainTexture.colorSpace = THREE.NoColorSpace;
+metalGrainTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+const silverMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0x9da1a4,
+  metalness: 0.97,
+  roughness: 0.28,
+  roughnessMap: metalGrainTexture,
+  bumpMap: metalGrainTexture,
+  bumpScale: 0.008,
+  clearcoat: 0.42,
+  clearcoatRoughness: 0.1,
+  envMapIntensity: 1.75,
+  flatShading: true,
+  side: THREE.DoubleSide
+});
+
+// ─── 加载模型 ────────────────────────────────────────────────────────────────
+const loader = new GLTFLoader();
+loader.load(
+  CONFIG.modelPath,
+  (gltf) => {
+    const model = gltf.scene;
+
+    // 1. 计算包围盒，将几何中心移到世界原点
+    const box = new THREE.Box3().setFromObject(model);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    model.position.sub(center); // 将模型平移使中心对齐世界原点
+
+    // 2. 放入 chairGroup，再次精确测量（居中后）
+    chairGroup.add(model);
+    const box2 = new THREE.Box3().setFromObject(chairGroup);
+    const size = new THREE.Vector3();
+    box2.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    // 透明阴影承接面：只保留柔和接触阴影，不显示任何白色方形地板
+    const shadowGeometry = new THREE.PlaneGeometry(maxDim * 8, maxDim * 8);
+    const shadowMaterial = new THREE.ShadowMaterial({
+      color: 0x8a8a8a,
+      opacity: 0.13,
+      transparent: true,
+      depthWrite: false
+    });
+    const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowCatcher.rotation.x = -Math.PI / 2;
+    shadowCatcher.position.y = box2.min.y - size.y * 0.035;
+    shadowCatcher.receiveShadow = true;
+    scene.add(shadowCatcher);
+
+    // 3. 根据 FOV 自动设置相机距离，保证椅子高度占屏 CONFIG.modelScreenHeight
+    // visibleHeight @ dist = 2 * tan(fov/2) * dist
+    const fovRad    = THREE.MathUtils.degToRad(camera.fov);
+    const dist      = (size.y / CONFIG.modelScreenHeight) / (2 * Math.tan(fovRad / 2));
+    camera.position.set(0, 0, dist);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    controls.target.set(0, 0, 0);
+    controls.update();
+
+    // 4. 世界单位悬浮幅度 & 排斥基准尺度
+    floatAmplitudeWorld = size.y * CONFIG.floatAmplitude;
+    modelSize           = maxDim;
+
+    console.log('模型加载成功');
+    console.log(`模型尺寸 x=${size.x.toFixed(3)}  y=${size.y.toFixed(3)}  z=${size.z.toFixed(3)}`);
+    console.log(`相机距离=${dist.toFixed(3)}  悬浮幅度=${floatAmplitudeWorld.toFixed(4)}`);
+
+    // 5. 将模型拆成独立三角面，随后移除原始完整模型。
+    // 每个三角面只做轻微位移，不旋转。
+    splitToTriangles(model);
+    chairGroup.remove(model);
+
+    console.log(`斥力交互已启用，独立三角面数量: ${triMeshes.length}`);
+  },
+  undefined,
+  (err) => {
+    console.error('模型加载失败:', err);
+    const message = document.createElement('div');
+    message.textContent = 'chair.glb 加载失败，请检查浏览器控制台';
+    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:10;';
+    document.body.appendChild(message);
+  }
+);
+
+// ─── 拆分三角面 ──────────────────────────────────────────────────────────────
+function splitToTriangles(root) {
+  // 收集根节点下所有 Mesh
+  const meshes = [];
+  root.traverse((obj) => { if (obj.isMesh) meshes.push(obj); });
+
+  // 所有三角面统一使用银灰色金属材质
+
+  meshes.forEach((sourceMesh) => {
+    sourceMesh.updateWorldMatrix(true, false);
+    const wm = sourceMesh.matrixWorld.clone(); // 包含父级居中偏移
+
+    // toNonIndexed：每三个顶点构成独立三角面，顶点不再共享
+    const geo = sourceMesh.geometry.toNonIndexed();
+    geo.applyMatrix4(wm); // 烘焙世界变换，之后 mesh.position 只做附加偏移
+
+    const posAttr    = geo.attributes.position;
+    const uvAttr     = geo.attributes.uv;
+    const normAttr   = geo.attributes.normal;
+    const triCount   = posAttr.count / 3;
+
+    // 材质数组（单材质包装成数组统一处理）
+    const mats = Array.isArray(sourceMesh.material)
+      ? sourceMesh.material : [sourceMesh.material];
+
+    // 建立三角面 → 材质索引的映射
+    const triMatIndex = new Uint16Array(triCount);
+    const groups = geo.groups.length > 0
+      ? geo.groups
+      : [{ start: 0, count: posAttr.count, materialIndex: 0 }];
+    groups.forEach(({ start, count, materialIndex }) => {
+      const s = start / 3, e = (start + count) / 3;
+      for (let t = s; t < e; t++) triMatIndex[t] = materialIndex;
+    });
+
+    for (let i = 0; i < triCount; i++) {
+      const base = i * 3;
+
+      // 位置：3 个顶点 × 3 分量
+      const triPos = new Float32Array(9);
+      for (let v = 0; v < 3; v++) {
+        triPos[v*3  ] = posAttr.getX(base + v);
+        triPos[v*3+1] = posAttr.getY(base + v);
+        triPos[v*3+2] = posAttr.getZ(base + v);
+      }
+      const triGeo = new THREE.BufferGeometry();
+      triGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3));
+
+      // UV（保留，贴图正常显示所必须）
+      if (uvAttr) {
+        const triUV = new Float32Array(6);
+        for (let v = 0; v < 3; v++) {
+          triUV[v*2  ] = uvAttr.getX(base + v);
+          triUV[v*2+1] = uvAttr.getY(base + v);
+        }
+        triGeo.setAttribute('uv', new THREE.BufferAttribute(triUV, 2));
+      }
+
+      // 法线（保留，材质光照所必须）
+      if (normAttr) {
+        const triNorm = new Float32Array(9);
+        for (let v = 0; v < 3; v++) {
+          triNorm[v*3  ] = normAttr.getX(base + v);
+          triNorm[v*3+1] = normAttr.getY(base + v);
+          triNorm[v*3+2] = normAttr.getZ(base + v);
+        }
+        triGeo.setAttribute('normal', new THREE.BufferAttribute(triNorm, 3));
+      } else {
+        triGeo.computeVertexNormals();
+      }
+
+      // 统一覆盖原模型材质，获得一致的雕塑级银灰金属效果
+      const mesh = new THREE.Mesh(triGeo, silverMaterial);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      // mesh.position 初始为 (0,0,0)；geometry 顶点已是世界坐标，
+      // 所以 mesh.position 是"相对原始位置的额外偏移"
+
+      // 计算三角面中心（世界坐标，t=0 时与局部坐标相同）
+      triGeo.computeBoundingBox();
+      const origCenter = new THREE.Vector3();
+      triGeo.boundingBox.getCenter(origCenter);
+
+      // 平均面法线（用于排斥方向微调）
+      const fn = new THREE.Vector3();
+      if (normAttr) {
+        fn.set(
+          normAttr.getX(base) + normAttr.getX(base+1) + normAttr.getX(base+2),
+          normAttr.getY(base) + normAttr.getY(base+1) + normAttr.getY(base+2),
+          normAttr.getZ(base) + normAttr.getZ(base+1) + normAttr.getZ(base+2)
+        ).normalize();
+      }
+
+      chairGroup.add(mesh);
+      triMeshes.push({
+        mesh,
+        origCenter,           // 世界空间原始中心（t=0）
+        faceNormal: fn,
+        currentOffset: new THREE.Vector3(),
+        targetOffset:  new THREE.Vector3()
+      });
+    }
+  });
+}
+
+// ─── 鼠标事件 ────────────────────────────────────────────────────────────────
+renderer.domElement.addEventListener('pointermove', (e) => {
+  mouseOnCanvas = true;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse2D.set(
+     ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+    -((e.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+});
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button === 2) isOrbiting = true;
+});
+
+window.addEventListener('pointerup', () => {
+  isOrbiting = false;
+});
+
+renderer.domElement.addEventListener('pointerleave', () => {
+  mouseOnCanvas = false;
+  isOrbiting = false;
+});
+
+// ─── 窗口缩放 ────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─── 主动画循环 ──────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const elapsed = clock.getElapsedTime();
+
+  // ① 椅子容器悬浮（只改 Y）
+  chairRoot.position.y = Math.sin(elapsed * CONFIG.floatSpeed) * floatAmplitudeWorld;
+
+  // ② 更新鼠标三维位置。
+  // 交互平面始终穿过椅子中心并正对当前相机，因此旋转视角后斥力仍然准确。
+  if (mouseOnCanvas && !isOrbiting && triMeshes.length > 0) {
+    camera.getWorldDirection(_cameraDir);
+    hitPlane.setFromNormalAndCoplanarPoint(_cameraDir, chairRoot.position);
+    raycaster.setFromCamera(mouse2D, camera);
+    const hit = raycaster.ray.intersectPlane(hitPlane, _hitResult);
+    if (hit !== null) mouse3DTarget.copy(hit);
+    mouse3D.lerp(mouse3DTarget, CONFIG.pointerEase);
+  }
+
+  // ③ 预计算排斥半径 / 强度（世界单位）
+  const repelR = modelSize * CONFIG.repelRadius;
+  const repelS = modelSize * CONFIG.repelStrength;
+
+  // ④ 逐三角面计算排斥 + 恢复
+  for (let i = 0; i < triMeshes.length; i++) {
+    const tri = triMeshes[i];
+
+    if (mouseOnCanvas && !isOrbiting) {
+      // 三角面当前世界位置 = 原始中心 + 悬浮 Y + 当前额外偏移
+      _worldPos.copy(tri.origCenter);
+      _worldPos.y += chairRoot.position.y;
+      _worldPos.add(tri.currentOffset);
+
+      _diff.subVectors(_worldPos, mouse3D);
+      const dist = _diff.length();
+
+      if (dist < repelR && dist > 1e-5) {
+        // smoothstep 衰减：边界 0、中心 1
+        const t       = dist / repelR;
+        const falloff = 1.0 - t * t * (3.0 - 2.0 * t);
+
+        // 排斥方向：从鼠标指向三角面中心，混合少量面法线
+        _repelDir.copy(_diff).normalize();
+        _repelDir.addScaledVector(tri.faceNormal, 0.08).normalize();
+
+        tri.targetOffset.copy(_repelDir).multiplyScalar(repelS * falloff);
+      } else {
+        tri.targetOffset.set(0, 0, 0);
+      }
+    } else {
+      // 鼠标不在画布内，全部归零
+      tri.targetOffset.set(0, 0, 0);
+    }
+
+    // 弹簧缓动恢复
+    tri.currentOffset.lerp(tri.targetOffset, CONFIG.returnEase);
+
+    // 将偏移写入 mesh.position（相对 chairGroup，即世界空间偏移）
+    tri.mesh.position.copy(tri.currentOffset);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>

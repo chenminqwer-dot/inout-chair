@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chair</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      background: #ffffff;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 400vh;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+      z-index: 1;
+    }
+
+    .scroll-track {
+      position: relative;
+      height: auto;
+      pointer-events: none;
+    }
+
+    .scroll-panel {
+      height: 100vh;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+
+    .page-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111111;
+    }
+
+    .gallery-brand {
+      position: absolute;
+      top: 28px;
+      left: 52px;
+    }
+
+
+    .gallery-brand img {
+      display: block;
+      width: 150px;
+      height: auto;
+    }
+
+    .chair-brand {
+      position: absolute;
+      left: 52px;
+      bottom: 27px;
+    }
+
+
+
+    .chair-brand img {
+      display: block;
+      width: 150px;
+      height: auto;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      right: 34px;
+      bottom: 27px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .serial-number-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 11;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .serial-number {
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #000000;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.045em;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      will-change: left, top, opacity;
+    }
+
+    .final-intro {
+      position: fixed;
+      left: 52px;
+      right: 52px;
+      bottom: 82px;
+      z-index: 0;
+      color: #000000;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: clamp(34px, 3.7vw, 68px);
+      font-weight: 800;
+      line-height: 0.98;
+      letter-spacing: -0.045em;
+      text-transform: uppercase;
+      white-space: pre-line;
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 220ms linear, transform 320ms ease;
+      pointer-events: none;
+      max-width: calc(100vw - 104px);
+    }
+
+    .final-intro.is-visible {
+      transform: translateY(0);
+    }
+
+    .dimensions-panel {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 12;
+      color: #000000;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: clamp(24px, 2.2vw, 38px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      text-align: left;
+      white-space: pre-line;
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      pointer-events: none;
+      will-change: left, top, opacity;
+    }
+
+    .screen-progress {
+      position: fixed;
+      right: 18px;
+      top: 50%;
+      z-index: 20;
+      width: 4px;
+      height: 220px;
+      transform: translateY(-50%);
+      background: #d7dbe0;
+      pointer-events: auto;
+    }
+
+    .screen-progress__thumb {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 4px;
+      height: 55px;
+      background: #06142b;
+      transform: translateY(0);
+      transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+
+    .screen-progress__hit {
+      position: absolute;
+      left: -10px;
+      width: 24px;
+      height: 25%;
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .screen-progress__hit:nth-child(2) { top: 0; }
+    .screen-progress__hit:nth-child(3) { top: 25%; }
+    .screen-progress__hit:nth-child(4) { top: 50%; }
+    .screen-progress__hit:nth-child(5) { top: 75%; }
+
+    @media (max-width: 700px) {
+      .gallery-brand {
+        top: 18px;
+        left: 18px;
+      }
+
+      .gallery-brand img {
+        width: 112px;
+      }
+
+      .chair-brand {
+        left: 18px;
+        bottom: 18px;
+      }
+
+      .chair-brand img {
+        width: 112px;
+      }
+
+      .scroll-hint {
+        right: 18px;
+        bottom: 18px;
+        font-size: 10px;
+      }
+      .serial-number {
+        font-size: 38px;
+      }
+
+      .final-intro {
+        left: 18px;
+        right: 18px;
+        bottom: 72px;
+        font-size: clamp(24px, 7vw, 40px);
+        max-width: calc(100vw - 36px);
+      }
+
+      .dimensions-panel {
+        font-size: clamp(20px, 6vw, 30px);
+      }
+
+      .screen-progress {
+        right: 10px;
+        height: 160px;
+      }
+
+      .screen-progress__thumb {
+        height: 40px;
+      }
+    }
+
+
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div class="page-ui" aria-hidden="true">
+    <div class="gallery-brand">
+      <img src="./gallery-logo.svg" alt="" />
+    </div>
+
+    <div class="chair-brand">
+      <img src="./chair-logo.svg" alt="" />
+    </div>
+
+    <div class="scroll-hint">SCROLL DOWN TO DISCOVER MORE</div>
+    <div class="serial-number-layer" id="serialNumberLayer"></div>
+
+    <div class="dimensions-panel" id="dimensionsPanel">DIMENSIONS :
+L 59 CM / 23.2 IN
+D 55 CM / 21.7 IN
+H 78 CM / 30.7 IN
+WEIGHT : 14KG</div>
+
+    <div class="screen-progress" id="screenProgress">
+      <div class="screen-progress__thumb" id="screenProgressThumb"></div>
+      <button class="screen-progress__hit" type="button" data-screen="0" aria-label="Go to screen 1"></button>
+      <button class="screen-progress__hit" type="button" data-screen="1" aria-label="Go to screen 2"></button>
+      <button class="screen-progress__hit" type="button" data-screen="2" aria-label="Go to screen 3"></button>
+      <button class="screen-progress__hit" type="button" data-screen="3" aria-label="Go to screen 4"></button>
+    </div>
+  </div>
+  <div class="final-intro" id="finalIntro"></div>
+  <div class="scroll-track" aria-hidden="true">
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+    <div class="scroll-panel"></div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ─── 可调参数 ────────────────────────────────────────────────────────────────
+const CONFIG = {
+  modelPath:         new URL('./chair.glb', import.meta.url).href,
+  modelScreenHeight:  0.65,
+  floatAmplitude:     0.0,
+  floatSpeed:         0.7,
+  repelRadius:        0.86,
+  repelStrength:      0.42,
+  arrayRepelRadius:   3.40,
+  arrayRepelStrength: 0.54,
+  arrayRotationStrength: 0.22,
+  rotationStrength:   0.16,
+  rotationEase:       0.10,
+  returnEase:         0.12,
+  pointerEase:        0.22
+};
+
+
+// ─── 渲染器 ──────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ─── 场景 / 相机 ─────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = null;
+
+// 中性摄影棚环境反射，让银灰金属呈现真实高光与明暗层次
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+const roomEnvironment = new RoomEnvironment();
+scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
+roomEnvironment.dispose();
+pmremGenerator.dispose();
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+
+// ─── 视角控制：滚动负责场景过渡，右键仍可自由旋转视角 ────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enabled = true;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.enableZoom = false;
+controls.enableRotate = true;
+controls.target.set(0, 0, 0);
+controls.mouseButtons.LEFT = null;
+controls.mouseButtons.MIDDLE = null;
+controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+
+// ─── 灯光 ────────────────────────────────────────────────────────────────────
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x9a9a9a, 0.5);
+scene.add(hemiLight);
+
+// 低角度太阳光：从画面左上方斜射，形成清晰而较长的落地投影
+const topLight = new THREE.DirectionalLight(0xffffff, 4.4);
+topLight.position.set(-12, 9, 10);
+topLight.target.position.set(0, 0, 0);
+topLight.castShadow = true;
+topLight.shadow.mapSize.set(2048, 2048);
+topLight.shadow.camera.near = 0.1;
+topLight.shadow.camera.far = 120;
+topLight.shadow.bias = -0.00035;
+topLight.shadow.normalBias = 0.025;
+topLight.shadow.radius = 3.5;
+scene.add(topLight);
+scene.add(topLight.target);
+
+const frontFill = new THREE.DirectionalLight(0xdfe5e8, 0.65);
+frontFill.position.set(2.5, 1.8, 4.5);
+scene.add(frontFill);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.9);
+rimLight.position.set(-3, 3.5, -4);
+scene.add(rimLight);
+
+// ─── 层级：chairRoot 做悬浮 Y 偏移，chairGroup 存放三角面 ────────────────────
+const chairRoot  = new THREE.Group();
+const chairGroup = new THREE.Group();
+chairRoot.add(chairGroup);
+scene.add(chairRoot);
+
+// ─── 鼠标交互用的不可见平面（法线朝相机，即 +Z 方向；平面 z=0 恒不变）──────
+// camera 在 z 轴正方向，模型中心在原点，z=0 平面是最合理的交互面
+const hitPlane   = new THREE.Plane();
+const _cameraDir = new THREE.Vector3();
+const raycaster  = new THREE.Raycaster();
+const _hitResult = new THREE.Vector3(); // intersectPlane 复用目标
+
+// ─── 运行时状态 ──────────────────────────────────────────────────────────────
+let triMeshes          = [];   // { mesh, origCenter, faceNormal, currentOffset, targetOffset }
+let modelSize          = 1;    // 包围盒最大维度（世界单位）
+let floatAmplitudeWorld= 0.1;  // 悬浮幅度（世界单位）
+let chairModelSize = new THREE.Vector3(1, 1, 1);
+
+let scrollProgress = 0;
+let lastAppliedScrollProgress = -1;
+
+const closeCameraPosition = new THREE.Vector3();
+const closeCameraTarget = new THREE.Vector3();
+const frontCameraPosition = new THREE.Vector3();
+const frontCameraTarget = new THREE.Vector3();
+const middleCameraPosition = new THREE.Vector3();
+const middleCameraTarget = new THREE.Vector3();
+const arrayCameraPosition = new THREE.Vector3();
+const arrayCameraTarget = new THREE.Vector3();
+const finalChairCameraPosition = new THREE.Vector3();
+const finalChairCameraTarget = new THREE.Vector3();
+const currentCameraPosition = new THREE.Vector3();
+const currentCameraTarget = new THREE.Vector3();
+
+const mouse2D      = new THREE.Vector2(-9999, -9999); // NDC
+const mouse3D      = new THREE.Vector3();              // 平滑后的 3D 鼠标位置
+const mouse3DTarget= new THREE.Vector3();              // 射线命中目标
+let   mouseOnCanvas= false;
+let   isOrbiting   = false;
+
+// 每帧复用的临时向量，避免 GC
+const _worldPos = new THREE.Vector3();
+const _diff     = new THREE.Vector3();
+const _repelDir = new THREE.Vector3();
+const _serialWorldPos = new THREE.Vector3();
+const _serialScreenPos = new THREE.Vector3();
+
+// 生成细密、低对比度的金属颗粒纹理，用于微表面粗糙度和极轻微凹凸
+const metalGrainCanvas = document.createElement('canvas');
+metalGrainCanvas.width = 512;
+metalGrainCanvas.height = 512;
+const grainCtx = metalGrainCanvas.getContext('2d');
+const grainImage = grainCtx.createImageData(512, 512);
+
+for (let i = 0; i < grainImage.data.length; i += 4) {
+  const fineNoise = 38 + Math.random() * 176;
+  const occasionalSpark = Math.random() > 0.965 ? 38 + Math.random() * 44 : 0;
+  const value = Math.min(255, fineNoise + occasionalSpark);
+  grainImage.data[i] = value;
+  grainImage.data[i + 1] = value;
+  grainImage.data[i + 2] = value;
+  grainImage.data[i + 3] = 255;
+}
+
+grainCtx.putImageData(grainImage, 0, 0);
+
+const metalGrainTexture = new THREE.CanvasTexture(metalGrainCanvas);
+metalGrainTexture.wrapS = THREE.RepeatWrapping;
+metalGrainTexture.wrapT = THREE.RepeatWrapping;
+metalGrainTexture.repeat.set(18, 18);
+metalGrainTexture.colorSpace = THREE.NoColorSpace;
+metalGrainTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+const goldMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xb78b32,
+  metalness: 0.96,
+  roughness: 0.23,
+  roughnessMap: metalGrainTexture,
+  bumpMap: metalGrainTexture,
+  bumpScale: 0.014,
+  clearcoat: 0.46,
+  clearcoatRoughness: 0.08,
+  envMapIntensity: 2.0,
+  flatShading: true,
+  side: THREE.DoubleSide
+});
+const chairMaterial = goldMaterial;
+const chairInstances = [];
+
+// 受斥力影响的碎片改为纯白非金属材质，只保留自然明度、阴影与少量表面高光
+
+const whiteFragmentMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  metalness: 0.0,
+  roughness: 0.42,
+  clearcoat: 0.12,
+  clearcoatRoughness: 0.3,
+  envMapIntensity: 0.65,
+  flatShading: true,
+  side: THREE.DoubleSide
+});
+
+// ─── 椅子序列编号 ────────────────────────────────────────────────────────────
+// 编号隐藏在椅子内部，只有面片被斥力拆散后才逐渐显现。
+function createSerialNumberLabel(number) {
+  const element = document.createElement('div');
+  element.className = 'serial-number';
+  element.textContent = String(number).padStart(3, '0');
+  document.getElementById('serialNumberLayer').appendChild(element);
+  return element;
+}
+
+// ─── 最后一屏文字：读取同目录 intro.rtf ─────────────────────────────────────
+const finalIntro = document.getElementById('finalIntro');
+const dimensionsPanel = document.getElementById('dimensionsPanel');
+const screenProgress = document.getElementById('screenProgress');
+const screenProgressThumb = document.getElementById('screenProgressThumb');
+const scrollPanels = Array.from(document.querySelectorAll('.scroll-panel'));
+
+let finalIntroRevealAmount = 0;
+let dimensionsRevealAmount = 0;
+let activeScreenIndex = 0;
+let isSnapping = false;
+
+function updateScreenProgress(index) {
+  const maxIndex = Math.max(1, scrollPanels.length - 1);
+  const trackTravel = screenProgress.clientHeight - screenProgressThumb.clientHeight;
+  const offset = trackTravel * (index / maxIndex);
+  screenProgressThumb.style.transform = `translateY(${offset}px)`;
+}
+
+function goToScreen(index, behavior = 'smooth') {
+  const clampedIndex = THREE.MathUtils.clamp(index, 0, scrollPanels.length - 1);
+  activeScreenIndex = clampedIndex;
+  isSnapping = true;
+  window.scrollTo({
+    top: clampedIndex * window.innerHeight,
+    behavior
+  });
+  updateScreenProgress(clampedIndex);
+
+  window.setTimeout(() => {
+    isSnapping = false;
+  }, behavior === 'smooth' ? 650 : 0);
+}
+
+screenProgress.querySelectorAll('[data-screen]').forEach((button) => {
+  button.addEventListener('click', () => {
+    goToScreen(Number(button.dataset.screen));
+  });
+});
+
+function decodeRtfToPlainText(rtf) {
+  let text = rtf;
+
+  // 去除常见的非正文 RTF 分组
+  text = text.replace(/\{\\(?:fonttbl|colortbl|stylesheet|info|pict)[\s\S]*?\}(?=\s*\})?/g, ' ');
+
+  // Unicode 与十六进制转义
+  text = text.replace(/\\u(-?\d+)\??/g, (_, value) => {
+    let code = Number(value);
+    if (code < 0) code += 65536;
+    return String.fromCharCode(code);
+  });
+  text = text.replace(/\\'([0-9a-fA-F]{2})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+
+  // 保留段落和换行
+  text = text.replace(/\\par[d]?\b/g, '\n');
+  text = text.replace(/\\line\b/g, '\n');
+  text = text.replace(/\\tab\b/g, ' ');
+
+  // 还原转义字符，再移除其余控制词和大括号
+  text = text.replace(/\\([\\{}])/g, '$1');
+  text = text.replace(/\\[a-zA-Z]+-?\d* ?/g, '');
+  text = text.replace(/[{}]/g, '');
+
+  const cleanedText = text
+    .replace(/\r/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // 删除 RTF 文件开头残留的控制符号，例如反斜杠、星号、方块和引号。
+  // 正文从第一个包含至少 3 个英文字母的行开始保留。
+  const lines = cleanedText.split('\n');
+  while (lines.length > 0) {
+    const letterCount = (lines[0].match(/[A-Za-z]/g) || []).length;
+    if (letterCount >= 3) break;
+    lines.shift();
+  }
+
+  return lines.join('\n').trim();
+}
+
+fetch(new URL('./intro.rtf', import.meta.url))
+  .then((response) => {
+    if (!response.ok) throw new Error(`intro.rtf HTTP ${response.status}`);
+    return response.text();
+  })
+  .then((rtf) => {
+    finalIntro.textContent = decodeRtfToPlainText(rtf);
+  })
+  .catch((error) => {
+    console.error('intro.rtf 加载失败:', error);
+  });
+
+
+// ─── 加载模型 ────────────────────────────────────────────────────────────────
+const loader = new GLTFLoader();
+loader.load(
+  CONFIG.modelPath,
+  (gltf) => {
+    const sourceModel = gltf.scene;
+
+    const box = new THREE.Box3().setFromObject(sourceModel);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    sourceModel.position.sub(center);
+    sourceModel.updateMatrixWorld(true);
+
+    const centeredBox = new THREE.Box3().setFromObject(sourceModel);
+    const size = new THREE.Vector3();
+    centeredBox.getSize(size);
+    chairModelSize.copy(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    modelSize = maxDim;
+    floatAmplitudeWorld = size.y * CONFIG.floatAmplitude;
+
+    const columns = 8;
+    const rows = 4;
+    const spacingX = size.x * 2.55;
+    const spacingZ = size.z * 3.10;
+    const layouts = [];
+
+    // 32 把椅子从第一帧开始就全部存在，不再缩放出现。
+    // 以主椅为原点建立 8 × 4 错列阵列，周围椅子自然延伸到画面之外。
+    const heroRow = 2;
+    const heroColumn = 3;
+    const heroStaggerX = heroRow % 2 === 0 ? 0 : spacingX * 0.5;
+    const heroAnchorX = (heroColumn - (columns - 1) / 2) * spacingX + heroStaggerX;
+    const heroAnchorZ = (heroRow - (rows - 1) / 2) * spacingZ;
+
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < columns; column++) {
+        const staggerX = row % 2 === 0 ? 0 : spacingX * 0.5;
+        const targetPosition = new THREE.Vector3(
+          (column - (columns - 1) / 2) * spacingX + staggerX - heroAnchorX,
+          0,
+          (row - (rows - 1) / 2) * spacingZ - heroAnchorZ
+        );
+        const isHero = row === heroRow && column === heroColumn;
+        const index = row * columns + column;
+
+        layouts.push({
+          material: chairMaterial,
+          startPosition: targetPosition.clone(),
+          targetPosition: targetPosition.clone(),
+          startScale: 1,
+          phase: index * 0.24,
+          isHero
+        });
+      }
+    }
+
+    layouts.forEach((layout) => {
+      const instanceRoot = new THREE.Group();
+      const instanceGroup = new THREE.Group();
+      instanceRoot.position.copy(layout.startPosition);
+      instanceRoot.scale.setScalar(layout.startScale);
+      instanceRoot.add(instanceGroup);
+      chairRoot.add(instanceRoot);
+
+      const chairState = {
+        root: instanceRoot,
+        phase: layout.phase,
+        startPosition: layout.startPosition.clone(),
+        targetPosition: layout.targetPosition.clone(),
+        startScale: layout.startScale,
+        isHero: layout.isHero,
+        serialLabel: null,
+        serialAnchor: new THREE.Vector3(
+          0,
+          size.y * 0.43,
+          centeredBox.max.z + size.z * 0.035
+        ),
+        infoAnchor: new THREE.Vector3(
+          0,
+          size.y * 0.02,
+          centeredBox.max.z + size.z * 0.04
+        ),
+        serialInfluence: 0,
+        serialOpacity: 0
+      };
+      instanceRoot.userData.chairState = chairState;
+
+      const modelClone = sourceModel.clone(true);
+      instanceGroup.add(modelClone);
+      splitToTriangles(modelClone, instanceGroup, layout.material, instanceRoot);
+      instanceGroup.remove(modelClone);
+
+      const serialLabel = createSerialNumberLabel(chairInstances.length + 1);
+      chairState.serialLabel = serialLabel;
+
+      chairInstances.push(chairState);
+    });
+
+    // 暂时把所有椅子放到第二屏目标位置，以计算完整阵列尺寸
+    chairInstances.forEach((chair) => {
+      chair.root.position.copy(chair.targetPosition);
+      chair.root.scale.setScalar(1);
+    });
+    chairRoot.updateMatrixWorld(true);
+
+    const arrayBox = new THREE.Box3().setFromObject(chairRoot);
+    const arraySize = new THREE.Vector3();
+    const arrayCenter = new THREE.Vector3();
+    arrayBox.getSize(arraySize);
+    arrayBox.getCenter(arrayCenter);
+
+    // 恢复第一屏：保留完整阵列，只切换到极近距离镜头
+    chairInstances.forEach((chair) => {
+      chair.root.position.copy(chair.startPosition);
+      chair.root.scale.setScalar(chair.startScale);
+    });
+    chairRoot.updateMatrixWorld(true);
+
+    const fovRad = THREE.MathUtils.degToRad(camera.fov);
+    const heroVerticalDist = (size.y / CONFIG.modelScreenHeight) / (2 * Math.tan(fovRad / 2));
+    const horizontalFov = 2 * Math.atan(Math.tan(fovRad / 2) * camera.aspect);
+    const heroHorizontalDist = (size.x / 0.72) / (2 * Math.tan(horizontalFov / 2));
+    const heroDist = Math.max(heroVerticalDist, heroHorizontalDist) * 1.02;
+    const arrayRadius = arraySize.length() * 0.5;
+
+    // 第一、二屏：稳定的正面单椅视角
+    closeCameraPosition.set(0, size.y * 0.08, heroDist * 1.02);
+    closeCameraTarget.set(0, 0, 0);
+
+    // 第二屏：低机位正面进入阵列
+    const frontDirection = new THREE.Vector3(0, 0.20, 1).normalize();
+    const frontDistance = (arrayRadius / Math.sin(fovRad * 0.5)) * 0.34;
+    frontCameraPosition.copy(arrayCenter).addScaledVector(frontDirection, frontDistance);
+    frontCameraTarget.copy(arrayCenter);
+    frontCameraTarget.y += size.y * 0.04;
+
+    // 第三屏：中距离右上方观察
+    const middleDirection = new THREE.Vector3(0.76, 0.55, 1.34).normalize();
+    const middleDistance = (arrayRadius / Math.sin(fovRad * 0.5)) * 0.50;
+    middleCameraPosition.copy(arrayCenter).addScaledVector(middleDirection, middleDistance);
+    middleCameraTarget.copy(arrayCenter);
+    middleCameraTarget.y += size.y * 0.06;
+
+    // 第四屏：高位右上方完整总览
+    const arrayDistance = (arrayRadius / Math.sin(fovRad * 0.5)) * 0.74;
+    const isometricDirection = new THREE.Vector3(1.15, 1.55, 1.15).normalize();
+    arrayCameraPosition.copy(arrayCenter).addScaledVector(isometricDirection, arrayDistance);
+    arrayCameraTarget.copy(arrayCenter);
+    arrayCameraTarget.y += size.y * 0.08;
+
+    // 最后一屏保持高位阵列构图，只做非常轻微的推进与抬升，避免突然甩回单椅视角
+    finalChairCameraPosition.lerpVectors(
+      arrayCameraPosition,
+      arrayCameraTarget,
+      0.08
+    );
+    finalChairCameraPosition.y += size.y * 0.035;
+    finalChairCameraTarget.copy(arrayCameraTarget);
+    finalChairCameraTarget.y += size.y * 0.018;
+
+    // 阴影相机覆盖完整椅子阵列，保证边缘椅子的长投影也不会被裁切
+    const shadowExtent = Math.max(arraySize.x, arraySize.z) * 0.82;
+    topLight.target.position.copy(arrayCenter);
+    topLight.shadow.camera.left = -shadowExtent;
+    topLight.shadow.camera.right = shadowExtent;
+    topLight.shadow.camera.top = shadowExtent;
+    topLight.shadow.camera.bottom = -shadowExtent;
+    topLight.shadow.camera.updateProjectionMatrix();
+
+    camera.position.copy(closeCameraPosition);
+    camera.lookAt(closeCameraTarget);
+    camera.updateProjectionMatrix();
+
+    const shadowGeometry = new THREE.PlaneGeometry(arraySize.x * 1.45, arraySize.z * 1.45);
+    const shadowMaterial = new THREE.ShadowMaterial({
+      color: 0x8a8a8a,
+      opacity: 0.20,
+      transparent: true,
+      depthWrite: false
+    });
+    const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowCatcher.rotation.x = -Math.PI / 2;
+    shadowCatcher.position.set(arrayCenter.x, -size.y * 0.53, arrayCenter.z);
+    shadowCatcher.receiveShadow = true;
+    scene.add(shadowCatcher);
+
+    console.log(`金色椅子加载成功，独立三角面总数: ${triMeshes.length}`);
+  },
+  undefined,
+  (err) => {
+    console.error('模型加载失败:', err);
+    const message = document.createElement('div');
+    message.textContent = '页面初始化失败，请检查浏览器控制台';
+    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:10;';
+    document.body.appendChild(message);
+  }
+);
+
+// ─── 拆分三角面 ──────────────────────────────────────────────────────────────
+function splitToTriangles(root, targetGroup, baseMaterial, instanceRoot) {
+  // 收集根节点下所有 Mesh
+  const meshes = [];
+  root.traverse((obj) => { if (obj.isMesh) meshes.push(obj); });
+
+  // 所有三角面统一使用银灰色金属材质
+
+  meshes.forEach((sourceMesh) => {
+    sourceMesh.updateWorldMatrix(true, false);
+    targetGroup.updateWorldMatrix(true, false);
+
+    // 只烘焙相对于当前椅子容器的局部变换，避免阵列位置被重复计算
+    const localMatrix = targetGroup.matrixWorld.clone().invert().multiply(sourceMesh.matrixWorld);
+
+    // toNonIndexed：每三个顶点构成独立三角面，顶点不再共享
+    const geo = sourceMesh.geometry.toNonIndexed();
+    geo.applyMatrix4(localMatrix);
+
+    const posAttr    = geo.attributes.position;
+    const uvAttr     = geo.attributes.uv;
+    const normAttr   = geo.attributes.normal;
+    const triCount   = posAttr.count / 3;
+
+    // 材质数组（单材质包装成数组统一处理）
+    const mats = Array.isArray(sourceMesh.material)
+      ? sourceMesh.material : [sourceMesh.material];
+
+    // 建立三角面 → 材质索引的映射
+    const triMatIndex = new Uint16Array(triCount);
+    const groups = geo.groups.length > 0
+      ? geo.groups
+      : [{ start: 0, count: posAttr.count, materialIndex: 0 }];
+    groups.forEach(({ start, count, materialIndex }) => {
+      const s = start / 3, e = (start + count) / 3;
+      for (let t = s; t < e; t++) triMatIndex[t] = materialIndex;
+    });
+
+    for (let i = 0; i < triCount; i++) {
+      const base = i * 3;
+
+      // 位置：3 个顶点 × 3 分量
+      const triPos = new Float32Array(9);
+      for (let v = 0; v < 3; v++) {
+        triPos[v*3  ] = posAttr.getX(base + v);
+        triPos[v*3+1] = posAttr.getY(base + v);
+        triPos[v*3+2] = posAttr.getZ(base + v);
+      }
+      const triGeo = new THREE.BufferGeometry();
+      triGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3));
+
+      // UV（保留，贴图正常显示所必须）
+      if (uvAttr) {
+        const triUV = new Float32Array(6);
+        for (let v = 0; v < 3; v++) {
+          triUV[v*2  ] = uvAttr.getX(base + v);
+          triUV[v*2+1] = uvAttr.getY(base + v);
+        }
+        triGeo.setAttribute('uv', new THREE.BufferAttribute(triUV, 2));
+      }
+
+      // 法线（保留，材质光照所必须）
+      if (normAttr) {
+        const triNorm = new Float32Array(9);
+        for (let v = 0; v < 3; v++) {
+          triNorm[v*3  ] = normAttr.getX(base + v);
+          triNorm[v*3+1] = normAttr.getY(base + v);
+          triNorm[v*3+2] = normAttr.getZ(base + v);
+        }
+        triGeo.setAttribute('normal', new THREE.BufferAttribute(triNorm, 3));
+      } else {
+        triGeo.computeVertexNormals();
+      }
+
+      // 先计算三角面中心，再把几何中心移到自身原点，确保旋转围绕面片自身中心发生
+      triGeo.computeBoundingBox();
+      const origCenter = new THREE.Vector3();
+      triGeo.boundingBox.getCenter(origCenter);
+      triGeo.translate(-origCenter.x, -origCenter.y, -origCenter.z);
+
+      const mesh = new THREE.Mesh(triGeo, baseMaterial);
+      mesh.position.copy(origCenter);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      // 平均面法线（用于排斥方向微调）
+      const fn = new THREE.Vector3();
+      if (normAttr) {
+        fn.set(
+          normAttr.getX(base) + normAttr.getX(base+1) + normAttr.getX(base+2),
+          normAttr.getY(base) + normAttr.getY(base+1) + normAttr.getY(base+2),
+          normAttr.getZ(base) + normAttr.getZ(base+1) + normAttr.getZ(base+2)
+        ).normalize();
+      }
+
+      targetGroup.add(mesh);
+      triMeshes.push({
+        mesh,
+        origCenter,           // 世界空间原始中心（t=0）
+        faceNormal: fn,
+        instanceRoot,
+        baseMaterial,
+        currentOffset: new THREE.Vector3(),
+        targetOffset:  new THREE.Vector3(),
+        rotationAxis: new THREE.Vector3(
+          Math.random() - 0.5,
+          Math.random() - 0.5,
+          Math.random() - 0.5
+        ).normalize(),
+        rotationDirection: Math.random() < 0.5 ? -1 : 1,
+        rotationAmount: THREE.MathUtils.lerp(0.55, 1.0, Math.random()),
+        currentRotation: new THREE.Vector3(),
+        targetRotation: new THREE.Vector3(),
+        currentInfluence: 0,  // 0 = 银灰金属，1 = 纯白受力状态
+        dynamicMaterial: null // 进入受力区域后按需创建，用于连续材质渐变
+      });
+    }
+  });
+}
+
+// ─── 鼠标事件 ────────────────────────────────────────────────────────────────
+renderer.domElement.addEventListener('pointermove', (e) => {
+  mouseOnCanvas = true;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse2D.set(
+     ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+    -((e.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+});
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (event.button === 2) isOrbiting = true;
+});
+
+window.addEventListener('pointerup', () => {
+  isOrbiting = false;
+});
+
+renderer.domElement.addEventListener('pointerleave', () => {
+  mouseOnCanvas = false;
+});
+
+// ─── 滚动驱动四个定格 ──────────────────────────────────────────────────────
+function updateScrollProgress() {
+  const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  scrollProgress = THREE.MathUtils.clamp(window.scrollY / maxScroll, 0, 1);
+
+  const nearestIndex = Math.round(window.scrollY / window.innerHeight);
+  activeScreenIndex = THREE.MathUtils.clamp(nearestIndex, 0, scrollPanels.length - 1);
+  updateScreenProgress(activeScreenIndex);
+}
+
+window.addEventListener('scroll', updateScrollProgress, { passive: true });
+updateScrollProgress();
+
+window.addEventListener('wheel', (event) => {
+  if (Math.abs(event.deltaY) < 8) return;
+  event.preventDefault();
+  if (isSnapping) return;
+
+  const direction = event.deltaY > 0 ? 1 : -1;
+  goToScreen(activeScreenIndex + direction);
+}, { passive: false });
+
+// ─── 窗口缩放 ────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─── 主动画循环 ──────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const elapsed = clock.getElapsedTime();
+
+  // ① 四屏顺序：单椅 + 受力信息 → 低机位阵列 + 编号 → 高位阵列 → 高位阵列 + intro
+  const transition = scrollProgress * scrollProgress * (3 - 2 * scrollProgress);
+
+  // 最后一屏直接显示 intro
+  const introTarget = THREE.MathUtils.smoothstep(scrollProgress, 0.80, 0.98);
+  finalIntroRevealAmount = THREE.MathUtils.lerp(
+    finalIntroRevealAmount,
+    introTarget,
+    0.14
+  );
+  finalIntro.style.opacity = String(finalIntroRevealAmount);
+  finalIntro.classList.toggle('is-visible', finalIntroRevealAmount > 0.02);
+
+  // 第一屏只保留主椅；滑向第二屏时其余椅子完整展开
+  const arrayReveal = THREE.MathUtils.smoothstep(scrollProgress, 0.10, 0.30);
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    const chair = chairInstances[i];
+    chair.root.position.lerpVectors(
+      chair.startPosition,
+      chair.targetPosition,
+      transition
+    );
+
+    const scale = chair.isHero
+      ? 1
+      : THREE.MathUtils.lerp(0.001, 1, arrayReveal);
+    chair.root.scale.setScalar(scale);
+  }
+
+  // ② 五个镜头：极近特写 → 低机位正面 → 中距离斜视 → 高位总览 → 单椅正面
+  if (Math.abs(scrollProgress - lastAppliedScrollProgress) > 0.0001) {
+    const segmentCount = 4;
+    const scaledProgress = THREE.MathUtils.clamp(scrollProgress, 0, 1) * segmentCount;
+    const segmentIndex = Math.min(segmentCount - 1, Math.floor(scaledProgress));
+    const rawSegmentProgress = scaledProgress - segmentIndex;
+    const segmentEase = rawSegmentProgress * rawSegmentProgress * (3 - 2 * rawSegmentProgress);
+
+    if (segmentIndex === 0) {
+      currentCameraPosition.lerpVectors(
+        closeCameraPosition,
+        frontCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        closeCameraTarget,
+        frontCameraTarget,
+        segmentEase
+      );
+    } else if (segmentIndex === 1) {
+      currentCameraPosition.lerpVectors(
+        frontCameraPosition,
+        middleCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        frontCameraTarget,
+        middleCameraTarget,
+        segmentEase
+      );
+    } else if (segmentIndex === 2) {
+      currentCameraPosition.lerpVectors(
+        middleCameraPosition,
+        arrayCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        middleCameraTarget,
+        arrayCameraTarget,
+        segmentEase
+      );
+    } else {
+      currentCameraPosition.lerpVectors(
+        arrayCameraPosition,
+        finalChairCameraPosition,
+        segmentEase
+      );
+      currentCameraTarget.lerpVectors(
+        arrayCameraTarget,
+        finalChairCameraTarget,
+        segmentEase
+      );
+    }
+
+    camera.position.copy(currentCameraPosition);
+    controls.target.copy(currentCameraTarget);
+    camera.lookAt(currentCameraTarget);
+    controls.update();
+    lastAppliedScrollProgress = scrollProgress;
+  }
+
+  // ③ 更新鼠标三维位置。
+  // 交互平面始终穿过椅子中心并正对当前相机，因此旋转视角后斥力仍然准确。
+  if (mouseOnCanvas && !isOrbiting && triMeshes.length > 0) {
+    camera.getWorldDirection(_cameraDir);
+    hitPlane.setFromNormalAndCoplanarPoint(_cameraDir, chairRoot.position);
+    raycaster.setFromCamera(mouse2D, camera);
+    const hit = raycaster.ray.intersectPlane(hitPlane, _hitResult);
+    if (hit !== null) mouse3DTarget.copy(hit);
+    mouse3D.lerp(mouse3DTarget, CONFIG.pointerEase);
+  }
+
+  // ④ 第一屏保持局部斥力；进入第二屏后扩大为可同时影响多把椅子的场域
+  const arrayInfluence = THREE.MathUtils.smoothstep(transition, 0.28, 1.0);
+  const activeRepelRadius = THREE.MathUtils.lerp(
+    CONFIG.repelRadius,
+    CONFIG.arrayRepelRadius,
+    arrayInfluence
+  );
+  const activeRepelStrength = THREE.MathUtils.lerp(
+    CONFIG.repelStrength,
+    CONFIG.arrayRepelStrength,
+    arrayInfluence
+  );
+  const activeRotationStrength = THREE.MathUtils.lerp(
+    CONFIG.rotationStrength,
+    CONFIG.arrayRotationStrength,
+    arrayInfluence
+  );
+
+  const repelR = modelSize * activeRepelRadius;
+  const repelS = modelSize * activeRepelStrength;
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    chairInstances[i].serialInfluence = 0;
+  }
+
+  // ⑤ 逐三角面计算排斥 + 恢复
+  for (let i = 0; i < triMeshes.length; i++) {
+    const tri = triMeshes[i];
+    const baseMaterial = tri.baseMaterial;
+    let influence = 0;
+    const chairState = tri.instanceRoot.userData.chairState;
+
+    if (mouseOnCanvas && !isOrbiting) {
+      // 三角面当前世界位置 = 原始中心 + 当前额外偏移
+      _worldPos.copy(tri.origCenter).add(tri.currentOffset);
+      tri.instanceRoot.localToWorld(_worldPos);
+
+      _diff.subVectors(_worldPos, mouse3D);
+      const dist = _diff.length();
+
+      if (dist < repelR && dist > 1e-5) {
+        // smoothstep 衰减：边界 0、中心 1
+        const t       = dist / repelR;
+        const falloff = 1.0 - t * t * (3.0 - 2.0 * t);
+        influence = falloff;
+
+        // 排斥方向：从鼠标指向三角面中心，混合少量面法线
+        _repelDir.copy(_diff).normalize();
+        _repelDir.addScaledVector(tri.faceNormal, 0.08).normalize();
+
+        tri.targetOffset.copy(_repelDir).multiplyScalar(repelS * falloff);
+        tri.targetRotation.copy(tri.rotationAxis).multiplyScalar(
+          activeRotationStrength * tri.rotationAmount * tri.rotationDirection * falloff
+        );
+      } else {
+        tri.targetOffset.set(0, 0, 0);
+        tri.targetRotation.set(0, 0, 0);
+      }
+    } else {
+      // 鼠标不在画布内，位移与旋转都平滑归零
+      tri.targetOffset.set(0, 0, 0);
+      tri.targetRotation.set(0, 0, 0);
+    }
+
+    // 弹簧缓动恢复
+    tri.currentOffset.lerp(tri.targetOffset, CONFIG.returnEase);
+    tri.currentRotation.lerp(tri.targetRotation, CONFIG.rotationEase);
+
+    // 受力程度连续过渡，不再在银灰和纯白之间生硬切换
+    tri.currentInfluence = THREE.MathUtils.lerp(
+      tri.currentInfluence,
+      influence,
+      0.12
+    );
+
+    if (chairState) {
+      chairState.serialInfluence = Math.max(
+        chairState.serialInfluence,
+        tri.currentInfluence
+      );
+    }
+
+    const blend = THREE.MathUtils.smoothstep(tri.currentInfluence, 0, 1);
+
+    if (blend > 0.002) {
+      // 仅在碎片真正进入受力区时创建独立材质，避免所有碎片预先复制材质
+      if (!tri.dynamicMaterial) {
+        tri.dynamicMaterial = baseMaterial.clone();
+        tri.mesh.material = tri.dynamicMaterial;
+      }
+
+      const material = tri.dynamicMaterial;
+      material.color.copy(baseMaterial.color).lerp(whiteFragmentMaterial.color, blend);
+      material.metalness = THREE.MathUtils.lerp(
+        baseMaterial.metalness,
+        whiteFragmentMaterial.metalness,
+        blend
+      );
+      material.roughness = THREE.MathUtils.lerp(
+        baseMaterial.roughness,
+        whiteFragmentMaterial.roughness,
+        blend
+      );
+      material.clearcoat = THREE.MathUtils.lerp(
+        baseMaterial.clearcoat,
+        whiteFragmentMaterial.clearcoat,
+        blend
+      );
+      material.clearcoatRoughness = THREE.MathUtils.lerp(
+        baseMaterial.clearcoatRoughness,
+        whiteFragmentMaterial.clearcoatRoughness,
+        blend
+      );
+      material.envMapIntensity = THREE.MathUtils.lerp(
+        baseMaterial.envMapIntensity,
+        whiteFragmentMaterial.envMapIntensity,
+        blend
+      );
+      material.bumpScale = THREE.MathUtils.lerp(
+        baseMaterial.bumpScale,
+        0,
+        blend
+      );
+      material.needsUpdate = true;
+    } else if (tri.dynamicMaterial) {
+      // 完全复位后重新共享金属材质，并释放独立材质
+      tri.mesh.material = baseMaterial;
+      tri.dynamicMaterial.dispose();
+      tri.dynamicMaterial = null;
+    }
+
+    // 位移叠加在原始中心上；旋转围绕面片自身中心轻微发生
+    tri.mesh.position.copy(tri.origCenter).add(tri.currentOffset);
+    tri.mesh.rotation.set(
+      tri.currentRotation.x,
+      tri.currentRotation.y,
+      tri.currentRotation.z
+    );
+  }
+
+  // 第一屏：主椅被拆散后显示尺寸与重量信息
+  const heroChair = chairInstances.find((chair) => chair.isHero);
+  const firstScreenVisibility = 1.0 - THREE.MathUtils.smoothstep(
+    scrollProgress,
+    0.06,
+    0.24
+  );
+  const dimensionsTarget = heroChair
+    ? THREE.MathUtils.smoothstep(heroChair.serialInfluence, 0.06, 0.30) * firstScreenVisibility
+    : 0;
+
+  dimensionsRevealAmount = THREE.MathUtils.lerp(
+    dimensionsRevealAmount,
+    dimensionsTarget,
+    0.18
+  );
+  if (heroChair) {
+    _serialWorldPos.copy(heroChair.infoAnchor);
+    heroChair.root.localToWorld(_serialWorldPos);
+    _serialScreenPos.copy(_serialWorldPos).project(camera);
+
+    const infoScreenX = (_serialScreenPos.x * 0.5 + 0.5) * window.innerWidth;
+    const infoScreenY = (-_serialScreenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+    dimensionsPanel.style.left = `${infoScreenX}px`;
+    dimensionsPanel.style.top = `${infoScreenY}px`;
+  }
+  dimensionsPanel.style.opacity = String(dimensionsRevealAmount);
+
+  // 阵列完整出现后：每把椅子被拆散时显示对应二维编号
+  const arrayNumberVisibility = THREE.MathUtils.smoothstep(
+    scrollProgress,
+    0.24,
+    0.36
+  );
+
+  for (let i = 0; i < chairInstances.length; i++) {
+    const chair = chairInstances[i];
+    if (!chair.serialLabel) continue;
+
+    const targetOpacity = THREE.MathUtils.smoothstep(
+      chair.serialInfluence,
+      0.06,
+      0.30
+    ) * arrayNumberVisibility;
+
+    chair.serialOpacity = THREE.MathUtils.lerp(
+      chair.serialOpacity,
+      targetOpacity,
+      0.18
+    );
+
+    // Compute screen position for label
+    _serialWorldPos.copy(chair.serialAnchor);
+    chair.root.localToWorld(_serialWorldPos);
+    _serialScreenPos.copy(_serialWorldPos).project(camera);
+
+    const visible = _serialScreenPos.z > -1 && _serialScreenPos.z < 1;
+    const screenX = (_serialScreenPos.x * 0.5 + 0.5) * window.innerWidth;
+    const screenY = (-_serialScreenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+    chair.serialLabel.style.left = `${screenX}px`;
+    chair.serialLabel.style.top = `${screenY}px`;
+    chair.serialLabel.style.opacity = visible ? String(chair.serialOpacity) : '0';
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
