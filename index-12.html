@@ -289,7 +289,6 @@
     .chair-carousel-button--next { right: 24px; }
 
     .certificate-page {
-      --certificate-heading-size: clamp(24px, 1.8vw, 32px);
       position: fixed;
       inset: 0;
       z-index: 40;
@@ -325,13 +324,13 @@
     .certificate-heading-button {
       position: absolute;
       left: 14.7vw;
-      top: 78px;
+      top: 54px;
       width: max-content;
       border: 0;
       padding: 0;
       background: transparent;
       color: #111111;
-      font: 800 var(--certificate-heading-size)/0.96 Arial, Helvetica, sans-serif;
+      font: 800 clamp(30px, 2.25vw, 40px)/0.96 Arial, Helvetica, sans-serif;
       letter-spacing: -0.05em;
       text-align: left;
       cursor: pointer;
@@ -353,7 +352,7 @@
       left: 4.05vw;
       margin: 0;
       color: #9b9b9b;
-      font-size: var(--certificate-heading-size);
+      font-size: clamp(25px, 1.8vw, 32px);
       font-weight: 700;
       line-height: 1;
       letter-spacing: -0.035em;
@@ -365,7 +364,7 @@
     }
 
     .certificate-label--artist {
-      left: 4.05vw;
+      left: 7.7vw;
       top: 62.2vh;
     }
 
@@ -491,10 +490,6 @@
       z-index: 2;
     }
 
-    .certificate-info-block:first-child {
-      font-size: var(--certificate-heading-size);
-    }
-
     .certificate-info-block + .certificate-info-block {
       margin-top: 5.8vh;
     }
@@ -534,7 +529,6 @@
     @media (max-width: 900px) {
       .certificate-page {
         overflow-y: auto;
-        --certificate-heading-size: clamp(20px, 2.8vw, 27px);
       }
 
       .certificate-logo {
@@ -546,8 +540,9 @@
 
       .certificate-heading-button {
         left: 206px;
-        top: 78px;
+        top: 52px;
         width: 150px;
+        font-size: clamp(20px, 2.8vw, 27px);
         line-height: 0.96;
         letter-spacing: -0.045em;
         white-space: normal;
@@ -679,8 +674,6 @@
 
 
   </style>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
   <script type="importmap">
   {
     "imports": {
@@ -786,28 +779,15 @@ const CONFIG = {
   pointerEase:        0.22
 };
 
-const isLowPowerDevice =
-  window.matchMedia('(max-width: 900px)').matches ||
-  /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
 
 // ─── 渲染器 ──────────────────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({
-  antialias: !isLowPowerDevice,
-  alpha: true,
-  powerPreference: 'high-performance',
-  preserveDrawingBuffer: false
-});
-renderer.setPixelRatio(
-  isLowPowerDevice
-    ? Math.min(window.devicePixelRatio, 1.2)
-    : Math.min(window.devicePixelRatio, 2)
-);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.12;
-renderer.shadowMap.enabled = !isLowPowerDevice;
+renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
@@ -816,13 +796,11 @@ const scene = new THREE.Scene();
 scene.background = null;
 
 // 中性摄影棚环境反射，让银灰金属呈现真实高光与明暗层次
-if (!isLowPowerDevice) {
-  const pmremGenerator = new THREE.PMREMGenerator(renderer);
-  const roomEnvironment = new RoomEnvironment();
-  scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
-  roomEnvironment.dispose();
-  pmremGenerator.dispose();
-}
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+const roomEnvironment = new RoomEnvironment();
+scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.04).texture;
+roomEnvironment.dispose();
+pmremGenerator.dispose();
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
 
@@ -849,10 +827,7 @@ const topLight = new THREE.DirectionalLight(0xffffff, 4.4);
 topLight.position.set(-12, 9, 10);
 topLight.target.position.set(0, 0, 0);
 topLight.castShadow = true;
-topLight.shadow.mapSize.set(
-  isLowPowerDevice ? 512 : 2048,
-  isLowPowerDevice ? 512 : 2048
-);
+topLight.shadow.mapSize.set(2048, 2048);
 topLight.shadow.camera.near = 0.1;
 topLight.shadow.camera.far = 120;
 topLight.shadow.bias = -0.00035;
@@ -884,9 +859,6 @@ const _hitResult = new THREE.Vector3(); // intersectPlane 复用目标
 
 // ─── 运行时状态 ──────────────────────────────────────────────────────────────
 let triMeshes          = [];   // { mesh, origCenter, faceNormal, currentOffset, targetOffset }
-let chairPickMeshes    = [];
-let heroModelReady     = false;
-let deferredDesktopSplitScheduled = false;
 let modelSize          = 1;    // 包围盒最大维度（世界单位）
 let floatAmplitudeWorld= 0.1;  // 悬浮幅度（世界单位）
 let chairModelSize = new THREE.Vector3(1, 1, 1);
@@ -926,11 +898,10 @@ const _pickPointer = new THREE.Vector2();
 
 // 生成细密、低对比度的金属颗粒纹理，用于微表面粗糙度和极轻微凹凸
 const metalGrainCanvas = document.createElement('canvas');
-const metalGrainSize = isLowPowerDevice ? 128 : 512;
-metalGrainCanvas.width = metalGrainSize;
-metalGrainCanvas.height = metalGrainSize;
+metalGrainCanvas.width = 512;
+metalGrainCanvas.height = 512;
 const grainCtx = metalGrainCanvas.getContext('2d');
-const grainImage = grainCtx.createImageData(metalGrainSize, metalGrainSize);
+const grainImage = grainCtx.createImageData(512, 512);
 
 for (let i = 0; i < grainImage.data.length; i += 4) {
   const fineNoise = 38 + Math.random() * 176;
@@ -947,53 +918,76 @@ grainCtx.putImageData(grainImage, 0, 0);
 const metalGrainTexture = new THREE.CanvasTexture(metalGrainCanvas);
 metalGrainTexture.wrapS = THREE.RepeatWrapping;
 metalGrainTexture.wrapT = THREE.RepeatWrapping;
-metalGrainTexture.repeat.set(isLowPowerDevice ? 8 : 18, isLowPowerDevice ? 8 : 18);
+metalGrainTexture.repeat.set(18, 18);
 metalGrainTexture.colorSpace = THREE.NoColorSpace;
-metalGrainTexture.anisotropy = isLowPowerDevice
-  ? 1
-  : renderer.capabilities.getMaxAnisotropy();
+metalGrainTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-const goldMaterial = isLowPowerDevice
-  ? new THREE.MeshStandardMaterial({
-      color: 0xb78b32,
-      metalness: 0.88,
-      roughness: 0.30,
-      flatShading: true,
-      side: THREE.DoubleSide
-    })
-  : new THREE.MeshPhysicalMaterial({
-      color: 0xb78b32,
-      metalness: 0.96,
-      roughness: 0.23,
-      roughnessMap: metalGrainTexture,
-      bumpMap: metalGrainTexture,
-      bumpScale: 0.014,
-      clearcoat: 0.46,
-      clearcoatRoughness: 0.08,
-      envMapIntensity: 2.0,
-      flatShading: true,
-      side: THREE.DoubleSide
-    });
-const chairMaterial = goldMaterial;
+const gradientChairMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  vertexColors: true,
+  metalness: 0.0,
+  roughness: 0.34,
+  clearcoat: 0.12,
+  clearcoatRoughness: 0.26,
+  transparent: false,
+  opacity: 1,
+  envMapIntensity: 0.8,
+  flatShading: true,
+  side: THREE.FrontSide
+});
+const chairMaterial = gradientChairMaterial;
 const chairInstances = [];
+
+function applyChairGradientColors(geometry, absolutePositions) {
+  const colorAttr = new Float32Array(absolutePositions.length);
+  const leftColor = new THREE.Color(0xc45a34);
+  const middleColor = new THREE.Color(0xc8c9ba);
+  const rightColor = new THREE.Color(0x009a80);
+  const topLightColor = new THREE.Color(0xffffff);
+  const bottomShadeColor = new THREE.Color(0x2d271f);
+  const color = new THREE.Color();
+
+  const width = Math.max(chairModelSize.x, 0.0001);
+  const height = Math.max(chairModelSize.y, 0.0001);
+
+  for (let i = 0; i < absolutePositions.length; i += 3) {
+    const normalizedX = THREE.MathUtils.clamp(absolutePositions[i] / width + 0.5, 0, 1);
+    const normalizedY = THREE.MathUtils.clamp(absolutePositions[i + 1] / height + 0.5, 0, 1);
+
+    if (normalizedX < 0.5) {
+      color.copy(leftColor).lerp(middleColor, normalizedX / 0.5);
+    } else {
+      color.copy(middleColor).lerp(rightColor, (normalizedX - 0.5) / 0.5);
+    }
+
+    const topMix = THREE.MathUtils.smoothstep(normalizedY, 0.42, 1.0) * 0.28;
+    const bottomMix = (1.0 - THREE.MathUtils.smoothstep(normalizedY, 0.0, 0.58)) * 0.18;
+    color.lerp(topLightColor, topMix);
+    color.lerp(bottomShadeColor, bottomMix);
+
+    colorAttr[i] = color.r;
+    colorAttr[i + 1] = color.g;
+    colorAttr[i + 2] = color.b;
+  }
+
+  geometry.setAttribute('color', new THREE.BufferAttribute(colorAttr, 3));
+}
 
 
 const chairMirrors = [];
 
 function getMirrorTextureSize() {
-  if (isLowPowerDevice) return 192;
-
   const longestSide = Math.max(window.innerWidth, window.innerHeight);
   return Math.min(
     768,
-    Math.max(384, Math.round(longestSide * Math.min(window.devicePixelRatio, 1.5) * 0.35))
+    Math.max(512, Math.round(longestSide * Math.min(window.devicePixelRatio, 1.25) * 0.5))
   );
 }
 
 // 仅供镜面反射使用的黑色背景；主场景仍保持透明，由网页白色背景显示。
 const skyCanvas = document.createElement('canvas');
-skyCanvas.width = isLowPowerDevice ? 2 : 1024;
-skyCanvas.height = isLowPowerDevice ? 2 : 512;
+skyCanvas.width = 1024;
+skyCanvas.height = 512;
 const skyCtx = skyCanvas.getContext('2d');
 skyCtx.fillStyle = '#000000';
 skyCtx.fillRect(0, 0, skyCanvas.width, skyCanvas.height);
@@ -1168,137 +1162,12 @@ const certificateRecords = [
   { object: 'SQN1-F2G', date: '2011', dimensions: 'L 63 CM / 24.8 IN\nD 59 CM / 23.2 IN\nH 82 CM / 32.3 IN', weight: '16KG', material: '304 MIRROR\nPOLISHED\nSTAINLESS STEEL' }
 ];
 
-function restoreCarouselSceneState(preferredChair = null) {
-  const restoredChair = preferredChair || certificateChair;
-
-  if (restoredChair && restoredChair.row === 1) {
-    carouselChairIndex = THREE.MathUtils.clamp(restoredChair.column, 0, 6);
-    carouselTargetOffsetX = -restoredChair.targetPosition.x;
-    carouselOffsetX = carouselTargetOffsetX;
-  }
-
-  certificateRotation = 0;
-
-  for (let i = 0; i < chairInstances.length; i++) {
-    const chair = chairInstances[i];
-    const isMiddleRow = chair.row === 1;
-
-    chair.root.visible = isMiddleRow;
-    chair.root.position.copy(chair.targetPosition);
-    chair.root.position.x += carouselOffsetX;
-    chair.root.position.z = 0;
-    chair.root.rotation.set(0, 0, 0);
-    chair.root.scale.setScalar(isMiddleRow ? 1 : 0.001);
-    chair.root.updateMatrixWorld(true);
-  }
-
-  for (let i = 0; i < chairMirrors.length; i++) {
-    const mirror = chairMirrors[i];
-    const chair = mirror.userData.chairState;
-    mirror.visible = Boolean(
-      chair &&
-      chair.row === 1 &&
-      chair.column === carouselChairIndex
-    );
-  }
-
-  camera.position.copy(carouselCameraPosition);
-  controls.target.copy(carouselCameraTarget);
-  camera.lookAt(carouselCameraTarget);
-  camera.updateMatrixWorld(true);
-  controls.update();
-
-  currentCameraPosition.copy(carouselCameraPosition);
-  currentCameraTarget.copy(carouselCameraTarget);
-  lastAppliedScrollProgress = -1;
-  updateCarouselButtons();
-}
-
-function prepareCertificateSceneState(chair) {
-  if (!chair) return;
-
-  for (let i = 0; i < chairInstances.length; i++) {
-    const item = chairInstances[i];
-    const isSelected = item === chair;
-
-    item.root.visible = isSelected;
-    item.root.rotation.set(0, 0, 0);
-    item.root.scale.setScalar(isSelected ? 1 : 0.001);
-  }
-
-  for (let i = 0; i < chairMirrors.length; i++) {
-    chairMirrors[i].visible = false;
-  }
-
-  const selectedSize = chair.modelSize || chairModelSize;
-  const selectedCenter = chair.modelCenter || _origin;
-  const isNarrowCertificate = window.innerWidth <= 900;
-  const certificateChairScale = isNarrowCertificate ? 0.62 : 0.74;
-
-  chair.root.position.set(
-    selectedSize.x * 0.34,
-    -selectedCenter.y - selectedSize.y * 0.015,
-    0
-  );
-  chair.root.scale.setScalar(certificateChairScale);
-  chair.root.rotation.set(0, 0.34, 0);
-  chair.root.updateMatrixWorld(true);
-
-  const certificateFov = THREE.MathUtils.degToRad(camera.fov);
-  const certificateHorizontalFov = 2 * Math.atan(
-    Math.tan(certificateFov / 2) * camera.aspect
-  );
-  const fitByHeight =
-    (selectedSize.y * certificateChairScale) /
-    (2 * Math.tan(certificateFov / 2) * 0.86);
-  const fitByWidth =
-    (selectedSize.x * certificateChairScale) /
-    (2 * Math.tan(certificateHorizontalFov / 2) * 0.48);
-  const certificateDistance = Math.max(fitByHeight, fitByWidth);
-
-  const certificateTarget = new THREE.Vector3(
-    chair.root.position.x - selectedSize.x * 0.34,
-    selectedSize.y * 0.015,
-    0
-  );
-
-  camera.position.set(
-    certificateTarget.x + certificateDistance * 0.38,
-    selectedSize.y * 0.055,
-    certificateDistance
-  );
-  camera.lookAt(certificateTarget);
-  camera.updateMatrixWorld(true);
-  controls.target.copy(certificateTarget);
-  controls.update();
-}
-function refreshChairLocalMetrics(chair) {
-  if (!chair || !chair.modelObject) return;
-
-  const originalParent = chair.modelObject.parent;
-  if (originalParent) originalParent.remove(chair.modelObject);
-
-  chair.modelObject.updateMatrixWorld(true);
-
-  const localBox = new THREE.Box3().setFromObject(chair.modelObject);
-  chair.modelSize.copy(localBox.getSize(new THREE.Vector3()));
-  chair.modelCenter.copy(localBox.getCenter(new THREE.Vector3()));
-
-  if (originalParent) originalParent.add(chair.modelObject);
-}
-
 function openCertificate(chair) {
-  if (!chair || certificateMode) return;
-    refreshChairLocalMetrics(chair);
-
-  // 每次进入前先从统一的横向浏览基准重新建立场景，避免上一次证书页留下的
-  // position / scale / rotation / camera 状态污染新椅子。
-  restoreCarouselSceneState(chair);
+  if (!chair) return;
 
   certificateMode = true;
   certificateChair = chair;
   certificateRotation = 0;
-  prepareCertificateSceneState(chair);
   requestAnimationFrame(resizeCollectorSignatureCanvas);
 
   const record = certificateRecords[chair.column] || certificateRecords[0];
@@ -1313,22 +1182,55 @@ function openCertificate(chair) {
 }
 
 function closeCertificate() {
-  if (!certificateMode) return;
-
-  const previouslySelectedChair = certificateChair;
   certificateMode = false;
-
   certificatePage.classList.remove('is-visible');
   certificatePage.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('is-certificate-open');
 
-  restoreCarouselSceneState(previouslySelectedChair);
-  certificateChair = null;
+  // 返回第五屏时，立即恢复横向浏览页面的完整状态，避免保留证书页中的
+  // 单椅放大、旋转、隐藏其他椅子和临时相机位置。
+  const restoredChair = certificateChair;
+  if (restoredChair) {
+    carouselChairIndex = THREE.MathUtils.clamp(restoredChair.column, 0, 6);
+    carouselTargetOffsetX = -restoredChair.targetPosition.x;
+    carouselOffsetX = carouselTargetOffsetX;
+  }
 
-  // 必须无动画回到第五屏。smooth scroll 会在下一次点击新椅子时继续改写
-  // activeScreenIndex 和相机，正是偶发巨大模型/错误裁切的来源。
+  for (let i = 0; i < chairInstances.length; i++) {
+    const chair = chairInstances[i];
+    const isMiddleRow = chair.row === 1;
+
+    chair.root.visible = isMiddleRow;
+    chair.root.rotation.set(0, 0, 0);
+    chair.root.scale.setScalar(isMiddleRow ? 1 : 0.001);
+    chair.root.position.copy(chair.targetPosition);
+    chair.root.position.x += carouselOffsetX;
+    chair.root.position.z = 0;
+  }
+
+  for (let i = 0; i < chairMirrors.length; i++) {
+    const mirror = chairMirrors[i];
+    const chair = mirror.userData.chairState;
+    mirror.visible = Boolean(chair && chair.row === 1);
+  }
+
+  camera.position.copy(carouselCameraPosition);
+  controls.target.copy(carouselCameraTarget);
+  camera.lookAt(carouselCameraTarget);
+  controls.update();
+  currentCameraPosition.copy(carouselCameraPosition);
+  currentCameraTarget.copy(carouselCameraTarget);
+
+  finalIntroRevealAmount = 0;
+  finalIntro.style.opacity = '0';
+  finalIntro.classList.remove('is-visible');
+  signatureRevealAmount = 0;
+  signaturePanel.style.opacity = '0';
+
+  certificateChair = null;
+  updateCarouselButtons();
   goToScreen(scrollPanels.length - 1, 'auto');
-  updateScrollProgress();
+  lastAppliedScrollProgress = -1;
 }
 
 certificateBackButton.addEventListener('click', closeCertificate);
@@ -1452,88 +1354,11 @@ fetch(new URL('./intro.rtf', import.meta.url))
 
 
 // ─── 加载模型 ────────────────────────────────────────────────────────────────
-const mobileLoadingNotice = document.createElement('div');
-mobileLoadingNotice.textContent = 'LOADING 3D';
-mobileLoadingNotice.style.cssText = [
-  'position:fixed',
-  'left:50%',
-  'top:50%',
-  'transform:translate(-50%,-50%)',
-  'z-index:60',
-  'font:700 12px/1 Arial,sans-serif',
-  'letter-spacing:.14em',
-  'color:#999',
-  'pointer-events:none',
-  'transition:opacity 180ms ease'
-].join(';');
-if (isLowPowerDevice) document.body.appendChild(mobileLoadingNotice);
 const loader = new GLTFLoader();
 
-let loadedHeroSource = null;
-
-function renderEmergencyHero(sourceModel, reason) {
-  console.warn('启用首椅保底渲染：', reason);
-
-  while (chairRoot.children.length > 0) {
-    chairRoot.remove(chairRoot.children[0]);
-  }
-  chairInstances.length = 0;
-  chairPickMeshes.length = 0;
-  triMeshes.length = 0;
-
-  const emergencyModel = sourceModel.clone(true);
-  emergencyModel.updateMatrixWorld(true);
-
-  const emergencyBox = new THREE.Box3().setFromObject(emergencyModel);
-  const emergencyCenter = emergencyBox.getCenter(new THREE.Vector3());
-  emergencyModel.position.sub(emergencyCenter);
-  emergencyModel.updateMatrixWorld(true);
-
-  const emergencySize = new THREE.Vector3();
-  new THREE.Box3().setFromObject(emergencyModel).getSize(emergencySize);
-  chairModelSize.copy(emergencySize);
-  modelSize = Math.max(emergencySize.x, emergencySize.y, emergencySize.z);
-
-  emergencyModel.traverse((object) => {
-    if (!object.isMesh) return;
-    object.material = chairMaterial;
-    object.castShadow = false;
-    object.receiveShadow = false;
-    object.userData.instanceRoot = null;
-  });
-
-  chairRoot.add(emergencyModel);
-  chairRoot.position.set(0, 0, 0);
-  chairRoot.scale.setScalar(1);
-  chairRoot.visible = true;
-
-  const fov = THREE.MathUtils.degToRad(camera.fov);
-  const verticalDistance =
-    emergencySize.y / (2 * Math.tan(fov / 2) * 0.72);
-  const horizontalFov = 2 * Math.atan(Math.tan(fov / 2) * camera.aspect);
-  const horizontalDistance =
-    emergencySize.x / (2 * Math.tan(horizontalFov / 2) * 0.72);
-  const distance = Math.max(verticalDistance, horizontalDistance, 1);
-
-  camera.position.set(0, emergencySize.y * 0.06, distance);
-  camera.lookAt(0, 0, 0);
-  controls.target.set(0, 0, 0);
-  controls.update();
-
-  heroModelReady = true;
-  renderer.setScissorTest(false);
-  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-  renderer.render(scene, camera);
-
-  if (mobileLoadingNotice.isConnected) {
-    mobileLoadingNotice.style.opacity = '0';
-    window.setTimeout(() => mobileLoadingNotice.remove(), 220);
-  }
-}
-
-// 首屏只加载 chair.glb；其余造型在首屏已经显示后再后台逐个加载。
-const heroModelPath = new URL('./chair.glb', import.meta.url).href;
-const deferredChairModelPaths = [
+// chair.glb 与 chair4.glb 是同一把，因此阵列只加载一份，避免重复造型。
+const chairModelPaths = [
+  './chair.glb',
   './chair1.glb',
   './chair2.glb',
   './chair3.glb',
@@ -1542,46 +1367,9 @@ const deferredChairModelPaths = [
   './chair7.glb'
 ].map((path) => new URL(path, import.meta.url).href);
 
-function scheduleIdleTask(task) {
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(task, { timeout: 1200 });
-  } else {
-    window.setTimeout(task, 240);
-  }
-}
-
-function normalizeModelToReference(model, referenceMaxDim) {
-  const modelBox = new THREE.Box3().setFromObject(model);
-  const modelCenter = new THREE.Vector3();
-  const modelSizeVector = new THREE.Vector3();
-  modelBox.getCenter(modelCenter);
-  modelBox.getSize(modelSizeVector);
-
-  model.position.sub(modelCenter);
-  model.updateMatrixWorld(true);
-
-  const modelMaxDim = Math.max(
-    modelSizeVector.x,
-    modelSizeVector.y,
-    modelSizeVector.z
-  );
-  const uniformScale = modelMaxDim > 0 ? referenceMaxDim / modelMaxDim : 1;
-  model.scale.setScalar(uniformScale);
-  model.updateMatrixWorld(true);
-
-  const scaledBox = new THREE.Box3().setFromObject(model);
-  const scaledCenter = new THREE.Vector3();
-  scaledBox.getCenter(scaledCenter);
-  model.position.sub(scaledCenter);
-  model.updateMatrixWorld(true);
-
-  return model;
-}
-
-loader.loadAsync(heroModelPath)
-  .then((heroGltf) => {
-    const sourceModel = heroGltf.scene;
-    loadedHeroSource = sourceModel;
+Promise.all(chairModelPaths.map((path) => loader.loadAsync(path)))
+  .then((gltfs) => {
+    const sourceModel = gltfs[0].scene;
 
     const box = new THREE.Box3().setFromObject(sourceModel);
     const center = new THREE.Vector3();
@@ -1595,11 +1383,39 @@ loader.loadAsync(heroModelPath)
     chairModelSize.copy(size);
     const maxDim = Math.max(size.x, size.y, size.z);
 
-    const arraySourceModels = Array.from({ length: 7 }, (_, modelIndex) => {
-      if (modelIndex === 0) return sourceModel;
-      const fallbackClone = sourceModel.clone(true);
-      fallbackClone.updateMatrixWorld(true);
-      return fallbackClone;
+    // 统一所有椅子模型的中心与视觉尺寸，阵列里随机使用不同造型。
+    const arraySourceModels = gltfs.map((loaded, modelIndex) => {
+      const model = loaded.scene;
+
+      if (modelIndex === 0) {
+        return sourceModel;
+      }
+
+      const modelBox = new THREE.Box3().setFromObject(model);
+      const modelCenter = new THREE.Vector3();
+      const modelSizeVector = new THREE.Vector3();
+      modelBox.getCenter(modelCenter);
+      modelBox.getSize(modelSizeVector);
+
+      model.position.sub(modelCenter);
+      model.updateMatrixWorld(true);
+
+      const modelMaxDim = Math.max(
+        modelSizeVector.x,
+        modelSizeVector.y,
+        modelSizeVector.z
+      );
+      const uniformScale = modelMaxDim > 0 ? maxDim / modelMaxDim : 1;
+      model.scale.setScalar(uniformScale);
+      model.updateMatrixWorld(true);
+
+      const scaledBox = new THREE.Box3().setFromObject(model);
+      const scaledCenter = new THREE.Vector3();
+      scaledBox.getCenter(scaledCenter);
+      model.position.sub(scaledCenter);
+      model.updateMatrixWorld(true);
+
+      return model;
     });
 
     modelSize = maxDim;
@@ -1635,8 +1451,6 @@ loader.loadAsync(heroModelPath)
     const heroAnchorZ = (heroRow - (rows - 1) / 2) * spacingZ;
 
     for (let row = 0; row < rows; row++) {
-      if (isLowPowerDevice && row !== heroRow) continue;
-
       for (let column = 0; column < columns; column++) {
         const staggerX = row % 2 === 0 ? 0 : spacingX * 0.5;
         const targetPosition = new THREE.Vector3(
@@ -1671,8 +1485,6 @@ loader.loadAsync(heroModelPath)
 
       const chairState = {
         root: instanceRoot,
-        instanceGroup,
-        modelObject: null,
         row: layout.row,
         column: layout.column,
         modelIndex: layout.modelIndex,
@@ -1700,65 +1512,53 @@ loader.loadAsync(heroModelPath)
       instanceRoot.userData.chairState = chairState;
 
       const modelClone = arraySourceModels[layout.modelIndex].clone(true);
-      modelClone.traverse((object) => {
-        if (!object.isMesh) return;
-        object.material = layout.material;
-        object.castShadow = !isLowPowerDevice;
-        object.receiveShadow = !isLowPowerDevice;
-        object.userData.instanceRoot = instanceRoot;
-        chairPickMeshes.push(object);
-      });
       instanceGroup.add(modelClone);
-      chairState.modelObject = modelClone;
+      splitToTriangles(modelClone, instanceGroup, layout.material, instanceRoot);
+      instanceGroup.remove(modelClone);
 
       // 每把椅子下方放置独立正方形镜面。
-      if (!isLowPowerDevice && layout.row === heroRow) {
-        // 每把椅子下方放置独立正方形镜面。
-        const mirrorMetric = arrayModelMetrics[layout.modelIndex];
-        const mirrorGeometry = new THREE.PlaneGeometry(
-          mirrorMetric.mirrorSize,
-          mirrorMetric.mirrorSize
-        );
-        const mirror = new Reflector(mirrorGeometry, {
-          clipBias: 0.001,
-          textureWidth: getMirrorTextureSize(),
-          textureHeight: getMirrorTextureSize(),
-          color: 0xf7fbff,
-          multisample: renderer.capabilities.isWebGL2 ? 4 : 0
-        });
-        mirror.rotation.x = -Math.PI / 2;
-        mirror.position.set(0, mirrorMetric.floorY - size.y * 0.006, 0);
-        mirror.renderOrder = 1;
-        const mirrorRenderTarget = mirror.getRenderTarget();
-        mirrorRenderTarget.texture.minFilter = THREE.LinearFilter;
-        mirrorRenderTarget.texture.magFilter = THREE.LinearFilter;
-        mirrorRenderTarget.texture.generateMipmaps = false;
-        if (renderer.capabilities.isWebGL2) {
-          mirrorRenderTarget.samples = 4;
+      const mirrorMetric = arrayModelMetrics[layout.modelIndex];
+      const mirrorGeometry = new THREE.PlaneGeometry(
+        mirrorMetric.mirrorSize,
+        mirrorMetric.mirrorSize
+      );
+      const mirror = new Reflector(mirrorGeometry, {
+        clipBias: 0.001,
+        textureWidth: getMirrorTextureSize(),
+        textureHeight: getMirrorTextureSize(),
+        color: 0xf7fbff,
+        multisample: 0
+      });
+      mirror.rotation.x = -Math.PI / 2;
+      mirror.position.set(0, mirrorMetric.floorY - size.y * 0.006, 0);
+      mirror.renderOrder = 1;
+      const mirrorRenderTarget = mirror.getRenderTarget();
+      mirrorRenderTarget.texture.minFilter = THREE.LinearFilter;
+      mirrorRenderTarget.texture.magFilter = THREE.LinearFilter;
+      mirrorRenderTarget.texture.generateMipmaps = false;
+      // removed: if (renderer.capabilities.isWebGL2) { mirrorRenderTarget.samples = 4; }
+      mirror.userData.chairState = chairState;
+      instanceGroup.add(mirror);
+      chairMirrors.push(mirror);
+
+      // 反射时临时切换为蓝天背景，并隐藏其他镜子，避免镜面之间递归反射。
+      const originalMirrorRender = mirror.onBeforeRender.bind(mirror);
+      mirror.onBeforeRender = function (...args) {
+        const previousBackground = scene.background;
+        const previousVisibility = chairMirrors.map((item) => item.visible);
+
+        scene.background = skyReflectionTexture;
+        for (let i = 0; i < chairMirrors.length; i++) {
+          chairMirrors[i].visible = chairMirrors[i] === mirror;
         }
-        mirror.userData.chairState = chairState;
-        instanceGroup.add(mirror);
-        chairMirrors.push(mirror);
 
-        // 反射时临时切换为蓝天背景，并隐藏其他镜子，避免镜面之间递归反射。
-        const originalMirrorRender = mirror.onBeforeRender.bind(mirror);
-        mirror.onBeforeRender = function (...args) {
-          const previousBackground = scene.background;
-          const previousVisibility = chairMirrors.map((item) => item.visible);
+        originalMirrorRender(...args);
 
-          scene.background = skyReflectionTexture;
-          for (let i = 0; i < chairMirrors.length; i++) {
-            chairMirrors[i].visible = chairMirrors[i] === mirror;
-          }
-
-          originalMirrorRender(...args);
-
-          scene.background = previousBackground;
-          for (let i = 0; i < chairMirrors.length; i++) {
-            chairMirrors[i].visible = previousVisibility[i];
-          }
-        };
-      }
+        scene.background = previousBackground;
+        for (let i = 0; i < chairMirrors.length; i++) {
+          chairMirrors[i].visible = previousVisibility[i];
+        }
+      };
 
       const serialLabel = createSerialNumberLabel(chairInstances.length + 1);
       chairState.serialLabel = serialLabel;
@@ -1862,131 +1662,26 @@ loader.loadAsync(heroModelPath)
     camera.lookAt(closeCameraTarget);
     camera.updateProjectionMatrix();
 
-    // 第一把椅子已经可以显示；先结束首屏等待，再后台加载其余造型。
-    heroModelReady = true;
-    renderer.render(scene, camera);
+    const shadowGeometry = new THREE.PlaneGeometry(arraySize.x * 1.45, arraySize.z * 1.45);
+    const shadowMaterial = new THREE.ShadowMaterial({
+      color: 0x8a8a8a,
+      opacity: 0.20,
+      transparent: true,
+      depthWrite: false
+    });
+    const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadowCatcher.rotation.x = -Math.PI / 2;
+    shadowCatcher.position.set(arrayCenter.x, -size.y * 0.53, arrayCenter.z);
+    shadowCatcher.receiveShadow = true;
+    scene.add(shadowCatcher);
 
-    if (!isLowPowerDevice) {
-      const shadowGeometry = new THREE.PlaneGeometry(arraySize.x * 1.45, arraySize.z * 1.45);
-      const shadowMaterial = new THREE.ShadowMaterial({
-        color: 0x8a8a8a,
-        opacity: 0.20,
-        transparent: true,
-        depthWrite: false
-      });
-      const shadowCatcher = new THREE.Mesh(shadowGeometry, shadowMaterial);
-      shadowCatcher.rotation.x = -Math.PI / 2;
-      shadowCatcher.position.set(arrayCenter.x, -size.y * 0.53, arrayCenter.z);
-      shadowCatcher.receiveShadow = true;
-      scene.add(shadowCatcher);
-    }
-
-    const replaceChairModel = (modelIndex, normalizedModel) => {
-      const matchingChairs = chairInstances.filter(
-        (chair) => chair.modelIndex === modelIndex
-      );
-
-      for (const chair of matchingChairs) {
-        const previousModel = chair.modelObject;
-        if (previousModel) {
-          previousModel.traverse((object) => {
-            if (!object.isMesh) return;
-            const pickIndex = chairPickMeshes.indexOf(object);
-            if (pickIndex >= 0) chairPickMeshes.splice(pickIndex, 1);
-          });
-          chair.instanceGroup.remove(previousModel);
-        }
-
-        const nextModel = normalizedModel.clone(true);
-        nextModel.traverse((object) => {
-          if (!object.isMesh) return;
-          object.material = chairMaterial;
-          object.castShadow = !isLowPowerDevice;
-          object.receiveShadow = !isLowPowerDevice;
-          object.userData.instanceRoot = chair.root;
-          chairPickMeshes.push(object);
-        });
-
-       nextModel.updateMatrixWorld(true);
-const nextBox = new THREE.Box3().setFromObject(nextModel);
-const nextSize = nextBox.getSize(new THREE.Vector3());
-const nextCenter = nextBox.getCenter(new THREE.Vector3());
-
-chair.instanceGroup.add(nextModel);
-chair.modelObject = nextModel;
-chair.modelSize.copy(nextSize);
-chair.modelCenter.copy(nextCenter);
-      }
-    };
-
-    const loadDeferredChair = (deferredIndex) => {
-      if (deferredIndex >= deferredChairModelPaths.length) return;
-
-      loader.loadAsync(deferredChairModelPaths[deferredIndex])
-        .then((loaded) => {
-          const normalizedModel = normalizeModelToReference(loaded.scene, maxDim);
-          replaceChairModel(deferredIndex + 1, normalizedModel);
-        })
-        .catch((error) => {
-          console.warn(`后台椅子 ${deferredIndex + 1} 加载失败，继续使用首椅占位：`, error);
-        })
-        .finally(() => {
-          scheduleIdleTask(() => loadDeferredChair(deferredIndex + 1));
-        });
-    };
-
-    scheduleIdleTask(() => loadDeferredChair(0));
-
-    // 桌面端只延迟拆分当前主椅；其余椅子始终保持完整 Mesh，避免首屏阻塞。
-    if (!isLowPowerDevice && !deferredDesktopSplitScheduled) {
-      deferredDesktopSplitScheduled = true;
-      window.setTimeout(() => {
-        const heroChair = chairInstances.find((chair) => chair.isHero);
-        if (!heroChair || !heroChair.modelObject) return;
-
-        heroChair.modelObject.traverse((object) => {
-          if (!object.isMesh) return;
-          const pickIndex = chairPickMeshes.indexOf(object);
-          if (pickIndex >= 0) chairPickMeshes.splice(pickIndex, 1);
-        });
-
-        splitToTriangles(
-          heroChair.modelObject,
-          heroChair.instanceGroup,
-          chairMaterial,
-          heroChair.root
-        );
-        heroChair.instanceGroup.remove(heroChair.modelObject);
-        heroChair.modelObject = null;
-      }, 900);
-    }
-
-    if (mobileLoadingNotice.isConnected) {
-      mobileLoadingNotice.style.opacity = '0';
-      window.setTimeout(() => mobileLoadingNotice.remove(), 220);
-    }
     console.log(`金色椅子加载成功，独立三角面总数: ${triMeshes.length}`);
   })
   .catch((err) => {
-    console.error('3D 初始化流程失败:', err);
-
-    if (loadedHeroSource) {
-      renderEmergencyHero(loadedHeroSource, err);
-      return;
-    }
-
-    if (mobileLoadingNotice.isConnected) {
-      mobileLoadingNotice.textContent = `3D LOAD FAILED: ${err?.message || err}`;
-      mobileLoadingNotice.style.color = '#c00';
-      mobileLoadingNotice.style.maxWidth = '82vw';
-      mobileLoadingNotice.style.textAlign = 'center';
-      mobileLoadingNotice.style.lineHeight = '1.45';
-      mobileLoadingNotice.style.whiteSpace = 'normal';
-    }
-
+    console.error('椅子模型加载或页面初始化失败:', err);
     const message = document.createElement('div');
-    message.textContent = `椅子模型加载失败：${err?.message || err}`;
-    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:61;';
+    message.textContent = '椅子模型加载失败，请检查文件名和浏览器控制台';
+    message.style.cssText = 'position:fixed;left:24px;bottom:24px;padding:10px 14px;background:#fff;color:#c00;font:14px sans-serif;border:1px solid #ddd;z-index:10;';
     document.body.appendChild(message);
   });
 
@@ -2040,6 +1735,7 @@ function splitToTriangles(root, targetGroup, baseMaterial, instanceRoot) {
       }
       const triGeo = new THREE.BufferGeometry();
       triGeo.setAttribute('position', new THREE.BufferAttribute(triPos, 3));
+      applyChairGradientColors(triGeo, triPos);
 
       // UV（保留，贴图正常显示所必须）
       if (uvAttr) {
@@ -2074,7 +1770,7 @@ function splitToTriangles(root, targetGroup, baseMaterial, instanceRoot) {
       mesh.position.copy(origCenter);
       mesh.userData.instanceRoot = instanceRoot;
       mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.receiveShadow = false;
 
       // 平均面法线（用于排斥方向微调）
       const fn = new THREE.Vector3();
@@ -2087,7 +1783,6 @@ function splitToTriangles(root, targetGroup, baseMaterial, instanceRoot) {
       }
 
       targetGroup.add(mesh);
-      chairPickMeshes.push(mesh);
       triMeshes.push({
         mesh,
         origCenter,           // 世界空间原始中心（t=0）
@@ -2151,7 +1846,10 @@ renderer.domElement.addEventListener('click', (event) => {
   );
 
   raycaster.setFromCamera(_pickPointer, camera);
-  const hits = raycaster.intersectObjects(chairPickMeshes, false);
+  const hits = raycaster.intersectObjects(
+    triMeshes.map((tri) => tri.mesh),
+    false
+  );
 
   if (hits.length === 0) return;
 
@@ -2201,11 +1899,6 @@ window.addEventListener('wheel', (event) => {
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(
-    isLowPowerDevice
-      ? Math.min(window.devicePixelRatio, 1.2)
-      : Math.min(window.devicePixelRatio, 2)
-  );
   renderer.setSize(window.innerWidth, window.innerHeight);
   for (let i = 0; i < chairMirrors.length; i++) {
     const renderTarget = chairMirrors[i].getRenderTarget?.();
@@ -2224,20 +1917,12 @@ function animate() {
   requestAnimationFrame(animate);
   const elapsed = clock.getElapsedTime();
 
-  if (!heroModelReady) {
-    controls.update();
-    renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-    renderer.render(scene, camera);
-    return;
-  }
-
   if (certificateMode && certificateChair) {
     for (let i = 0; i < chairInstances.length; i++) {
       const chair = chairInstances[i];
       const isSelected = chair === certificateChair;
       chair.root.visible = isSelected;
-      if (!isSelected) chair.root.scale.setScalar(0.001);
+      chair.root.scale.setScalar(isSelected ? 1 : 0.001);
     }
 
     for (let i = 0; i < chairMirrors.length; i++) {
@@ -2259,7 +1944,6 @@ function animate() {
 
     certificateRotation += 0.0028;
     certificateChair.root.rotation.set(0, certificateRotation + 0.34, 0);
-    certificateChair.root.updateMatrixWorld(true);
 
     const certificateFov = THREE.MathUtils.degToRad(camera.fov);
     const certificateHorizontalFov = 2 * Math.atan(
@@ -2394,13 +2078,24 @@ function animate() {
     }
   }
 
-  // 只渲染当前屏真正可见椅子的镜面，避免第二屏仍计算 21 个 Reflector。
-  const mirrorsEnabledForScreen = activeScreenIndex !== 2 && activeScreenIndex !== 3;
+  // Reflector 每显示一个都会额外重绘一次完整场景。只保留当前主椅的镜面，
+  // 避免一帧重复渲染 7 次以上导致鼠标交互明显卡顿。
   for (let i = 0; i < chairMirrors.length; i++) {
     const mirror = chairMirrors[i];
     const chair = mirror.userData.chairState;
-    const chairVisible = chair ? chair.root.visible : true;
-    mirror.visible = mirrorsEnabledForScreen && chairVisible;
+    let shouldShowMirror = false;
+
+    if (chair && chair.root.visible) {
+      if (activeScreenIndex === 0) {
+        shouldShowMirror = chair.isHero;
+      } else if (activeScreenIndex === 1) {
+        shouldShowMirror = chair.column === carouselChairIndex;
+      } else if (activeScreenIndex === 4) {
+        shouldShowMirror = chair.column === carouselChairIndex;
+      }
+    }
+
+    mirror.visible = shouldShowMirror;
   }
 
   // ② 五个停留镜头：原四屏镜头 + 第五屏横向椅子浏览
@@ -2504,9 +2199,14 @@ function animate() {
   // ⑤ 逐三角面计算排斥 + 恢复
   for (let i = 0; i < triMeshes.length; i++) {
     const tri = triMeshes[i];
+    const chairState = tri.instanceRoot.userData.chairState;
+
+    // 隐藏椅子的三角面不参与世界坐标、材质和斥力计算。
+    // 第一屏原先仍会逐帧处理全部 21 把椅子，这是主要卡顿来源之一。
+    if (chairState && !chairState.root.visible) continue;
+
     const baseMaterial = tri.baseMaterial;
     let influence = 0;
-    const chairState = tri.instanceRoot.userData.chairState;
 
     if (mouseOnCanvas && !isOrbiting && repulsionEnabled) {
       // 三角面当前世界位置 = 原始中心 + 当前额外偏移
@@ -2568,7 +2268,7 @@ function animate() {
       }
 
       const material = tri.dynamicMaterial;
-      material.color.copy(baseMaterial.color).lerp(whiteFragmentMaterial.color, blend);
+      material.color.set(0xffffff).lerp(whiteFragmentMaterial.color, blend);
       material.metalness = THREE.MathUtils.lerp(
         baseMaterial.metalness,
         whiteFragmentMaterial.metalness,
