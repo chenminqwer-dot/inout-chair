@@ -5,6 +5,164 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chair</title>
   <style>
+    .certificate-actions {
+      position: absolute;
+      left: 4.05vw;
+      bottom: 3.4vh;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .certificate-action-button,
+    .certificate-action-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 0 14px;
+      border: 1px solid #d8d8d8;
+      background: rgba(255, 255, 255, 0.92);
+      color: #111111;
+      font: 700 11px/1 Arial, Helvetica, sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .certificate-action-button:hover,
+    .certificate-action-link:hover {
+      background: #111111;
+      color: #ffffff;
+      border-color: #111111;
+    }
+
+    .certificate-action-button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    .certificate-preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.72);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 180ms ease, visibility 0s linear 180ms;
+    }
+
+    .certificate-preview-modal.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition-delay: 0s;
+    }
+
+    .certificate-preview-dialog {
+      position: relative;
+      width: min(1180px, 94vw);
+      height: min(820px, 90vh);
+      padding: 52px 18px 18px;
+      background: #ffffff;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+    }
+
+    .certificate-preview-title {
+      position: absolute;
+      left: 18px;
+      top: 17px;
+      font: 800 14px/1 Arial, Helvetica, sans-serif;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .certificate-preview-close {
+      position: absolute;
+      right: 14px;
+      top: 10px;
+      width: 34px;
+      height: 34px;
+      border: 0;
+      background: transparent;
+      color: #111111;
+      font: 300 30px/1 Arial, Helvetica, sans-serif;
+      cursor: pointer;
+    }
+
+    .certificate-preview-pages {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .certificate-preview-page {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .certificate-preview-page-label {
+      margin-bottom: 8px;
+      color: #777777;
+      font: 700 11px/1 Arial, Helvetica, sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .certificate-preview-page object {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      border: 1px solid #e5e5e5;
+      background: #f5f5f5;
+    }
+
+    @media (max-width: 700px) {
+      .certificate-actions {
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+        gap: 8px;
+      }
+
+      .certificate-action-button,
+      .certificate-action-link {
+        min-height: 32px;
+        padding: 0 10px;
+        font-size: 10px;
+      }
+
+      .certificate-preview-modal {
+        padding: 10px;
+      }
+
+      .certificate-preview-dialog {
+        width: 100%;
+        height: 94vh;
+        padding: 50px 10px 10px;
+      }
+
+      .certificate-preview-pages {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+      }
+
+      .certificate-preview-page {
+        min-height: 72vh;
+      }
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       width: 100%;
@@ -681,6 +839,7 @@
   </style>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script type="importmap">
   {
     "imports": {
@@ -748,7 +907,31 @@
     </div>
 
     <div class="certificate-footer">“Let Life In And Out Of Art”<br />IN&amp;OUT ©.2021</div>
+    <div class="certificate-actions" aria-label="Certificate actions">
+      <button class="certificate-action-button" id="previewCertificateButton" type="button">Preview Certificate</button>
+      <button class="certificate-action-button" id="downloadCertificateButton" type="button">Download Certificate</button>
+    </div>
   </section>
+  <div class="certificate-preview-modal" id="certificatePreviewModal" aria-hidden="true">
+    <div class="certificate-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="certificatePreviewTitle">
+      <div class="certificate-preview-title" id="certificatePreviewTitle">Collection Certificate Preview</div>
+      <button class="certificate-preview-close" id="certificatePreviewClose" type="button" aria-label="Close certificate preview">×</button>
+      <div class="certificate-preview-pages">
+        <div class="certificate-preview-page">
+          <div class="certificate-preview-page-label">Front</div>
+          <object id="certificatePreviewFrontObject" data="./正面.pdf" type="application/pdf">
+            <a href="./正面.pdf" target="_blank" rel="noopener">Open front PDF</a>
+          </object>
+        </div>
+        <div class="certificate-preview-page">
+          <div class="certificate-preview-page-label">Back</div>
+          <object id="certificatePreviewBackObject" data="./背面.pdf" type="application/pdf">
+            <a href="./背面.pdf" target="_blank" rel="noopener">Open back PDF</a>
+          </object>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="collector-signature-box" id="collectorSignatureBox" aria-label="Collector signature area">
     <canvas class="collector-signature-canvas" id="collectorSignatureCanvas"></canvas>
     <div class="collector-signature-placeholder">SIGN HERE TO RESERVE</div>
@@ -1535,7 +1718,144 @@ const certificateMaterial = document.getElementById('certificateMaterial');
 const collectorSignatureBox = document.getElementById('collectorSignatureBox');
 const collectorSignatureCanvas = document.getElementById('collectorSignatureCanvas');
 const collectorSignatureClear = document.getElementById('collectorSignatureClear');
+const previewCertificateButton = document.getElementById('previewCertificateButton');
+const downloadCertificateButton = document.getElementById('downloadCertificateButton');
+const certificatePreviewModal = document.getElementById('certificatePreviewModal');
+const certificatePreviewClose = document.getElementById('certificatePreviewClose');
+const certificatePreviewFrontObject = document.getElementById('certificatePreviewFrontObject');
+const certificatePreviewBackObject = document.getElementById('certificatePreviewBackObject');
 const collectorSignatureContext = collectorSignatureCanvas.getContext('2d');
+
+let certificatePreviewFrontUrl = null;
+let certificatePreviewBackUrl = null;
+
+function revokeCertificatePreviewUrls() {
+  if (certificatePreviewFrontUrl) {
+    URL.revokeObjectURL(certificatePreviewFrontUrl);
+    certificatePreviewFrontUrl = null;
+  }
+  if (certificatePreviewBackUrl) {
+    URL.revokeObjectURL(certificatePreviewBackUrl);
+    certificatePreviewBackUrl = null;
+  }
+}
+
+async function buildCertificatePdfAssets() {
+  if (!window.PDFLib?.PDFDocument) {
+    throw new Error('PDF library failed to load. Please check the network connection and refresh the page.');
+  }
+
+  const { PDFDocument } = window.PDFLib;
+  const [frontResponse, backResponse] = await Promise.all([
+    fetch(new URL('./正面.pdf', import.meta.url).href, { cache: 'no-store' }),
+    fetch(new URL('./背面.pdf', import.meta.url).href, { cache: 'no-store' })
+  ]);
+
+  if (!frontResponse.ok) {
+    throw new Error(`Front PDF HTTP ${frontResponse.status}`);
+  }
+  if (!backResponse.ok) {
+    throw new Error(`Back PDF HTTP ${backResponse.status}`);
+  }
+
+  const [frontBytes, backBytes] = await Promise.all([
+    frontResponse.arrayBuffer(),
+    backResponse.arrayBuffer()
+  ]);
+
+  const frontPdf = await PDFDocument.load(frontBytes);
+  const backPdf = await PDFDocument.load(backBytes);
+  const mergedPdf = await PDFDocument.create();
+
+  const frontPages = await mergedPdf.copyPages(
+    frontPdf,
+    frontPdf.getPageIndices()
+  );
+  const backPages = await mergedPdf.copyPages(
+    backPdf,
+    backPdf.getPageIndices()
+  );
+
+  frontPages.forEach((page) => mergedPdf.addPage(page));
+  backPages.forEach((page) => mergedPdf.addPage(page));
+
+  return {
+    frontBytes: new Uint8Array(frontBytes),
+    backBytes: new Uint8Array(backBytes),
+    mergedBytes: await mergedPdf.save()
+  };
+}
+
+async function openCertificatePreview() {
+  const originalLabel = previewCertificateButton.textContent;
+  previewCertificateButton.disabled = true;
+  previewCertificateButton.textContent = 'Preparing Preview...';
+
+  try {
+    const { frontBytes, backBytes } = await buildCertificatePdfAssets();
+    revokeCertificatePreviewUrls();
+
+    certificatePreviewFrontUrl = URL.createObjectURL(
+      new Blob([frontBytes], { type: 'application/pdf' })
+    );
+    certificatePreviewBackUrl = URL.createObjectURL(
+      new Blob([backBytes], { type: 'application/pdf' })
+    );
+
+    certificatePreviewFrontObject.data = certificatePreviewFrontUrl;
+    certificatePreviewBackObject.data = certificatePreviewBackUrl;
+    certificatePreviewModal.classList.add('is-visible');
+    certificatePreviewModal.setAttribute('aria-hidden', 'false');
+  } catch (error) {
+    console.error('收藏证书预览生成失败:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    window.alert(`Certificate preview could not be prepared.\n\n${errorMessage}`);
+  } finally {
+    previewCertificateButton.disabled = false;
+    previewCertificateButton.textContent = originalLabel;
+  }
+}
+
+function closeCertificatePreview() {
+  certificatePreviewModal.classList.remove('is-visible');
+  certificatePreviewModal.setAttribute('aria-hidden', 'true');
+}
+
+previewCertificateButton.addEventListener('click', openCertificatePreview);
+certificatePreviewClose.addEventListener('click', closeCertificatePreview);
+
+certificatePreviewModal.addEventListener('click', (event) => {
+  if (event.target === certificatePreviewModal) closeCertificatePreview();
+});
+
+async function downloadMergedCertificate() {
+  const originalLabel = downloadCertificateButton.textContent;
+  downloadCertificateButton.disabled = true;
+  downloadCertificateButton.textContent = 'Preparing PDF...';
+
+  try {
+    const { mergedBytes } = await buildCertificatePdfAssets();
+    const mergedBlob = new Blob([mergedBytes], { type: 'application/pdf' });
+    const mergedUrl = URL.createObjectURL(mergedBlob);
+    const temporaryLink = document.createElement('a');
+
+    temporaryLink.href = mergedUrl;
+    temporaryLink.download = '收藏证书.pdf';
+    document.body.appendChild(temporaryLink);
+    temporaryLink.click();
+    temporaryLink.remove();
+    URL.revokeObjectURL(mergedUrl);
+  } catch (error) {
+    console.error('收藏证书合并下载失败:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    window.alert(`Certificate PDF could not be prepared.\n\n${errorMessage}`);
+  } finally {
+    downloadCertificateButton.disabled = false;
+    downloadCertificateButton.textContent = originalLabel;
+  }
+}
+
+downloadCertificateButton.addEventListener('click', downloadMergedCertificate);
 
 let finalIntroRevealAmount = 0;
 let signatureRevealAmount = 0;
@@ -1778,7 +2098,8 @@ function refreshChairLocalMetrics(chair) {
 
 function openCertificate(chair) {
   if (!chair || certificateMode) return;
-    refreshChairLocalMetrics(chair);
+
+  refreshChairLocalMetrics(chair);
 
   // 每次进入前先从统一的横向浏览基准重新建立场景，避免上一次证书页留下的
   // position / scale / rotation / camera 状态污染新椅子。
@@ -1794,7 +2115,7 @@ function openCertificate(chair) {
   certificateIdentity.textContent = `OBJECT # ${record.object}\nDATE : ${record.date}`;
   certificateDimensions.textContent = `DIMENSIONS :\n${record.dimensions}`;
   certificateWeight.textContent = `WEIGHT : ${record.weight}`;
-  certificateMaterial.textContent = `MATERIAL :\n${record.material}`;
+  certificateMaterial.textContent = `MATERIAL :\n${record.material}`; 
 
   certificatePage.classList.add('is-visible');
   certificatePage.setAttribute('aria-hidden', 'false');
@@ -1803,6 +2124,10 @@ function openCertificate(chair) {
 
 function closeCertificate() {
   if (!certificateMode) return;
+  if (certificatePreviewModal.classList.contains('is-visible')) {
+    closeCertificatePreview();
+  }
+  revokeCertificatePreviewUrls();
 
   const previouslySelectedChair = certificateChair;
   certificateMode = false;
@@ -1822,6 +2147,10 @@ function closeCertificate() {
 
 certificateBackButton.addEventListener('click', closeCertificate);
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && certificatePreviewModal.classList.contains('is-visible')) {
+    closeCertificatePreview();
+    return;
+  }
   if (event.key === 'Escape' && certificateMode) closeCertificate();
 });
 
